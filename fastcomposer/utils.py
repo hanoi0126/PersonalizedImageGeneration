@@ -1,11 +1,7 @@
 import argparse
 import os
-from pathlib import Path
 
-import numpy as np
-import torch
 from accelerate.logging import get_logger
-from PIL import Image
 
 logger = get_logger(__name__)
 

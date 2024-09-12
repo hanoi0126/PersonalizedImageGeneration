@@ -1,15 +1,11 @@
-import itertools
 import os
 import types
 from pathlib import Path
 
-import numpy as np
 import torch
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 from diffusers import StableDiffusionPipeline
-from PIL import Image
-from tqdm.auto import tqdm
 from transformers import CLIPTokenizer
 
 from fastcomposer.data import DemoDataset
@@ -108,7 +104,7 @@ def main():
     batch = demo_dataset.get_data()
 
     input_ids = batch["input_ids"].to(accelerator.device)
-    text = tokenizer.batch_decode(input_ids)[0]
+    # text = tokenizer.batch_decode(input_ids)[0]
     print(prompt)
     # print(input_ids)
     image_token_mask = batch["image_token_mask"].to(accelerator.device)

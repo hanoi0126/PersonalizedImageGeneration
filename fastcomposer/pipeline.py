@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
@@ -13,15 +12,9 @@ from diffusers.pipelines.stable_diffusion.safety_checker import (
 )
 from diffusers.schedulers import KarrasDiffusionSchedulers
 from PIL import Image
-from torchvision import transforms as T
 from transformers import CLIPImageProcessor, CLIPTokenizer
 
-from fastcomposer.model import (
-    FastComposerCLIPImageEncoder,
-    FastComposerPostfuseModule,
-    FastComposerTextEncoder,
-)
-from fastcomposer.transforms import PadToSquare
+from fastcomposer.model import FastComposerTextEncoder
 
 
 class StableDiffusionFastCompposerPipeline(StableDiffusionPipeline):
@@ -249,14 +242,14 @@ class StableDiffusionFastCompposerPipeline(StableDiffusionPipeline):
             negative_prompt_embeds,
         )
 
-        assert (prompt != None and reference_subject_images != None) or (
-            prompt_embeds != None and augmented_prompt_embeds != None
+        assert (prompt is not None and reference_subject_images is not None) or (
+            prompt_embeds is not None and augmented_prompt_embeds is not None
         ), "Prompt and reference subject images or prompt_embeds and augmented_prompt_embeds must be provided."
 
         # 2. Define call parameters
-        if prompt is not None and isinstance(prompt, str):
+        if (prompt is not None) and isinstance(prompt, str):
             batch_size = 1
-        elif prompt is not None and isinstance(prompt, list):
+        elif (prompt is not None) and isinstance(prompt, list):
             batch_size = len(prompt)
         else:
             batch_size = prompt_embeds.shape[0]
@@ -282,7 +275,7 @@ class StableDiffusionFastCompposerPipeline(StableDiffusionPipeline):
             negative_prompt_embeds=negative_prompt_embeds,
         )
 
-        if augmented_prompt_embeds == None:
+        if augmented_prompt_embeds is None:
             augmented_prompt_embeds = self._encode_augmented_prompt(
                 prompt, reference_subject_images, device, prompt_embeds.dtype
             )

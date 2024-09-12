@@ -1,8 +1,6 @@
 from collections import OrderedDict
 
-import numpy as np
 import torch
-from PIL import Image
 from torchvision import transforms as T
 
 
@@ -85,7 +83,7 @@ class RandomZoomIn(torch.nn.Module):
 
     def forward(self, image: torch.Tensor):
         zoom = torch.rand(1) * (self.max_zoom - self.min_zoom) + self.min_zoom
-        original_shape = image.shape
+        # original_shape = image.shape
         image = T.functional.resize(
             image,
             (int(zoom * image.shape[1]), int(zoom * image.shape[2])),

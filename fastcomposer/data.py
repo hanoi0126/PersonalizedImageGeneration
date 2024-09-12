@@ -7,6 +7,7 @@ from copy import deepcopy
 import numpy as np
 import torch
 from torchvision.io import ImageReadMode, read_image
+from tqdm import tqdm
 
 
 def prepare_image_token_idx(image_token_mask, max_num_objects):
@@ -220,8 +221,8 @@ class FastComposerDataset(torch.utils.data.Dataset):
                     filtered_image_ids.append(image_id)
             self.image_ids = filtered_image_ids
 
-        if balance_num_objects:
-            _balance_num_objects(self)
+        # if balance_num_objects:
+        #     _balance_num_objects(self)
 
     def __len__(self):
         return len(self.image_ids)
