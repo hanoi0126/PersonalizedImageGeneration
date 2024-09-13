@@ -1,7 +1,7 @@
 # General Settings
 now_dir: ${now:%Y-%m-%d}/${now:%H-%M-%S}
 mixed_precision: fp16  # choices: ["no", "fp16", "bf16"]
-output_dir: outputs/fastcomposer/${now_dir}
+output_dir: outputs/${now_dir}
 seed: 42
 pretrained_model_path: models/basemodel
 finetuned_model_path: models/fastcomposer
