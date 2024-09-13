@@ -115,6 +115,7 @@ class DemoDataset(object):
                 + glob.glob(
                     os.path.join(self.test_reference_folder, image_id, "*.jpeg")
                 )
+                + glob.glob(os.path.join(self.test_reference_folder, image_id)) # add
             )[0]
 
             reference_image = self.object_transforms(
