@@ -44,16 +44,17 @@ RUN git clone --depth=1 https://github.com/pyenv/pyenv.git $PYENV_ROOT && \
 
 # Poetryのインストール
 ENV POETRY_HOME="/root/.local" \
-    PYTHONUNBUFFERED=1 \
     PATH="$POETRY_HOME/bin:$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH"
 
-RUN curl -sSL https://install.python-poetry.org | python3 - && \
-    poetry config virtualenvs.in-project true
+RUN curl -sSL https://install.python-poetry.org | python3 - 
+
+# Pythonのパスを追加
+ENV PYTHONPATH=/workspace:$PYTHONPATH \
+    PATH="/root/.local/bin:$PATH"
 
 # プロジェクトファイルをコピーしてPoetryで依存関係をインストール
 WORKDIR /workspace
 COPY pyproject.toml poetry.lock ./
-RUN poetry install --no-root
 
-# Pythonのパスを追加
-ENV PYTHONPATH=/workspace:$PYTHONPATH
+RUN poetry config virtualenvs.in-project true && \
+    poetry install --no-root

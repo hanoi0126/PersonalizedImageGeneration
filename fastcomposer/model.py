@@ -1,5 +1,6 @@
 import gc
 import types
+import warnings
 from typing import Optional, Tuple, Union
 
 import torch
@@ -16,6 +17,7 @@ from transformers.models.clip.modeling_clip import (
     _expand_mask,
 )
 
+warnings.filterwarnings("ignore", category=FutureWarning)
 inference_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
 
 
