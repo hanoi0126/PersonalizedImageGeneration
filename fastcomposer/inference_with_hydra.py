@@ -7,6 +7,7 @@ import torch
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 from diffusers import StableDiffusionPipeline
+from omegaconf import DictConfig
 from transformers import CLIPTokenizer
 
 from fastcomposer.data import DemoDataset
@@ -15,7 +16,6 @@ from fastcomposer.pipeline import (
     stable_diffusion_call_with_references_delayed_conditioning,
 )
 from fastcomposer.transforms import get_object_transforms
-from omegaconf import DictConfig, OmegaConf
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="config")
@@ -46,7 +46,7 @@ def main(cfg: DictConfig) -> None:
         cfg.pretrained_model_path, torch_dtype=weight_dtype
     )
 
-    model = FastComposerModel.from_pretrained(cfg) # TODO: Check this
+    model = FastComposerModel.from_pretrained(cfg)  # TODO: Check this
 
     ckpt_name = "pytorch_model.bin"
 
@@ -81,7 +81,7 @@ def main(cfg: DictConfig) -> None:
         revision=cfg.revision,
     )
 
-    object_transforms = get_object_transforms(cfg) # TODO: Check this
+    object_transforms = get_object_transforms(cfg)  # TODO: Check this
 
     demo_dataset = DemoDataset(
         test_caption=cfg.caption,
@@ -166,7 +166,6 @@ def main(cfg: DictConfig) -> None:
                 f"output_{instance_id}.png",
             )
         )
-
 
 
 if __name__ == "__main__":

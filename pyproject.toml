@@ -22,7 +22,6 @@ openai = "^1.45.0"
 [tool.poetry.group.dev.dependencies]
 black = "^24.8.0"
 isort = "^5.13.2"
-mypy = "^1.11.2"
 pyproject-flake8 = "^7.0.0"
 
 [build-system]

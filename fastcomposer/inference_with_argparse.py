@@ -2,7 +2,6 @@ import os
 import types
 from pathlib import Path
 
-import hydra
 import torch
 from accelerate import Accelerator
 from accelerate.utils import set_seed
