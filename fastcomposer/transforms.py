@@ -63,18 +63,6 @@ class CropTopSquare(torch.nn.Module):
         return image[:, :w, :]
 
 
-class AlwaysCropTopSquare(torch.nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, image: torch.Tensor):
-        _, h, w = image.shape
-        if h > w:
-            return image[:, :w, :]
-        else:  # h <= w
-            return image[:, :, w // 2 - h // 2 : w // 2 + h // 2]
-
-
 class RandomZoomIn(torch.nn.Module):
     def __init__(self, min_zoom=1.0, max_zoom=1.5):
         super().__init__()
@@ -180,45 +168,6 @@ class TestTransformWithSegmap(torch.nn.Module):
         return image, segmap
 
 
-def get_train_transforms(args):
-    train_transforms = torch.nn.Sequential(
-        T.Resize(
-            args.train_resolution,
-            interpolation=T.InterpolationMode.BILINEAR,
-            antialias=True,
-        ),
-        T.RandomHorizontalFlip(),
-        CenterCropOrPadSides(),
-        T.ConvertImageDtype(torch.float32),
-        T.Normalize([0.5], [0.5]),
-    )
-    return train_transforms
-
-
-def get_train_transforms_with_segmap(args):
-    train_transforms = TrainTransformWithSegmap(args)
-    return train_transforms
-
-
-def get_test_transforms(args):
-    test_transforms = torch.nn.Sequential(
-        T.Resize(
-            args.test_resolution,
-            interpolation=T.InterpolationMode.BILINEAR,
-            antialias=True,
-        ),
-        CenterCropOrPadSides(),
-        T.ConvertImageDtype(torch.float32),
-        T.Normalize([0.5], [0.5]),
-    )
-    return test_transforms
-
-
-def get_test_transforms_with_segmap(args):
-    test_transforms = TestTransformWithSegmap(args)
-    return test_transforms
-
-
 def get_object_transforms(cfg):
     if cfg.no_object_augmentation:
         pre_augmentations = []
@@ -269,31 +218,3 @@ def get_object_transforms(cfg):
         )
     )
     return object_transforms
-
-
-def get_test_object_transforms(args):
-    object_transforms = torch.nn.Sequential(
-        OrderedDict(
-            [
-                ("pad_to_square", PadToSquare(fill=0, padding_mode="constant")),
-                (
-                    "resize",
-                    T.Resize(
-                        (args.object_resolution, args.object_resolution),
-                        interpolation=T.InterpolationMode.BILINEAR,
-                        antialias=True,
-                    ),
-                ),
-                ("convert_to_float", T.ConvertImageDtype(torch.float32)),
-            ]
-        )
-    )
-    return object_transforms
-
-
-def get_object_processor(args):
-    if args.object_background_processor == "random":
-        object_processor = RandomSegmentProcessor()
-    else:
-        raise ValueError(f"Unknown object processor: {args.object_processor}")
-    return object_processor

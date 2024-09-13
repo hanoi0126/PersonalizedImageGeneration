@@ -90,40 +90,6 @@ class FastComposerCLIPImageEncoder(CLIPPreTrainedModel):
         return object_embeds
 
 
-def scatter_object_embeddings(
-    inputs_embeds,
-    image_token_mask,
-    object_embeds,
-    num_objects,
-    image_embedding_transform=None,
-):
-    object_embeds = object_embeds.to(inputs_embeds.dtype)
-
-    batch_size, max_num_objects = object_embeds.shape[:2]
-    seq_length = inputs_embeds.shape[1]
-    flat_object_embeds = object_embeds.view(
-        -1, object_embeds.shape[-2], object_embeds.shape[-1]
-    )
-
-    valid_object_mask = (
-        torch.arange(max_num_objects, device=flat_object_embeds.device)[None, :]
-        < num_objects[:, None]
-    )
-
-    valid_object_embeds = flat_object_embeds[valid_object_mask.flatten()]
-
-    if image_embedding_transform is not None:
-        valid_object_embeds = image_embedding_transform(valid_object_embeds)
-
-    inputs_embeds = inputs_embeds.view(-1, inputs_embeds.shape[-1])
-    image_token_mask = image_token_mask.view(-1)
-    valid_object_embeds = valid_object_embeds.view(-1, valid_object_embeds.shape[-1])
-
-    inputs_embeds.masked_scatter_(image_token_mask[:, None], valid_object_embeds)
-    inputs_embeds = inputs_embeds.view(batch_size, seq_length, -1)
-    return inputs_embeds
-
-
 def fuse_object_embeddings(
     inputs_embeds,
     image_token_mask,

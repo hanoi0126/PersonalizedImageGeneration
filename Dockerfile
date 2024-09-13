@@ -55,3 +55,4 @@ RUN curl -sSL https://install.python-poetry.org | python3 -
 RUN poetry config virtualenvs.in-project true
 COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-root
+ENV PYTHONPATH=/workspace:$PYTHONPATH
