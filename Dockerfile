@@ -45,7 +45,7 @@ RUN eval "$(pyenv init -)" && \
     pyenv global $PYTHON_VERSION
 
 RUN python3 --version
-WORKDIR /app
+WORKDIR /workspace
 
 # Python environment settings
 ENV POETRY_HOME="/root/.local" \
@@ -53,3 +53,5 @@ ENV POETRY_HOME="/root/.local" \
 ENV PATH="$POETRY_HOME/bin:$PATH"
 RUN curl -sSL https://install.python-poetry.org | python3 -
 RUN poetry config virtualenvs.in-project true
+COPY pyproject.toml poetry.lock ./
+RUN poetry install --no-root

@@ -1,0 +1,139 @@
+pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+revision: null
+dataset_name: null
+dataset_config_name: null
+train_data_dir: null
+image_column: "image"
+caption_column: "caption"
+max_train_samples: null
+output_dir: "log/fine_generator"
+cache_dir: null
+seed: null
+center_crop: false
+random_flip: false
+train_batch_size: 16
+num_train_epochs: 100
+max_train_steps: null
+gradient_accumulation_steps: 1
+gradient_checkpointing: false
+learning_rate: 1e-4
+scale_lr: false
+lr_scheduler: "constant"
+lr_warmup_steps: 500
+use_8bit_adam: false
+allow_tf32: false
+use_ema: false
+non_ema_revision: null
+dataloader_num_workers: 0
+adam_beta1: 0.9
+adam_beta2: 0.999
+adam_weight_decay: 1e-2
+adam_epsilon: 1e-08
+max_grad_norm: 1.0
+push_to_hub: false
+hub_token: null
+hub_model_id: null
+logging_dir: "logs"
+mixed_precision: null  # choices: ["no", "fp16", "bf16"]
+report_to: null  # choices: ["tensorboard", "wandb", "comet_ml", "all"]
+local_rank: -1
+checkpointing_steps: 500
+resume_from_checkpoint: null
+enable_xformers_memory_efficient_attention: false
+
+# Added arguments
+train_text_encoder: false
+train_image_encoder: false
+keep_only_last_checkpoint: false
+keep_interval: null
+
+# Inference specific arguments
+inference_steps: 50
+guidance_scale: 5
+num_images_per_prompt: 1
+evaluation_batch_size: 4
+finetuned_model_path: null
+start_idx: 0
+end_idx: 50
+text_prompt_only: false
+use_multiple_conditioning: false
+start_merge_step: 0
+
+# Image encoder settings
+image_encoder_type: "clip"  # choices: ["clip", "vae"]
+image_encoder_name_or_path: "openai/clip-vit-large-patch14"
+num_image_tokens: 1
+max_num_objects: 4
+
+# Resolutions
+train_resolution: 256
+object_resolution: 256
+test_resolution: 512
+generate_width: 512
+generate_height: 512
+
+# Object and augmentation settings
+object_appear_prob: 1.0
+no_object_augmentation: false
+image_encoder_trainable_layers: 0
+load_model: null
+uncondition_prob: 0
+text_only_prob: 0
+
+# LoRA (Low-Rank Adaptation) settings
+text_encoder_use_lora: false
+lora_text_encoder_r: 16
+lora_text_encoder_alpha: 16
+lora_text_encoder_dropout: 0.1
+lora_text_encoder_bias: "none"
+
+image_encoder_use_lora: false
+lora_image_encoder_r: 16
+lora_image_encoder_alpha: 16
+lora_image_encoder_dropout: 0.1
+lora_image_encoder_bias: "none"
+
+unet_use_lora: false
+unet_lora_alpha: 1.0
+
+# Output image settings
+num_rows: 1
+
+# Testing specific arguments
+test_caption: null
+test_reference_folder: null
+load_merged_lora_model: false
+object_background_processor: "random"
+disable_flashattention: false
+object_types: null
+object_localization: false
+localization_layers: 5
+object_localization_weight: 0.01
+object_localization_loss: "balanced_l1"
+object_localization_threshold: 1.0
+object_localization_normalize: false
+unet_lr_scale: 1.0
+
+# Multi-dataset support
+use_multiple_datasets: false
+num_datasets: 1
+min_num_objects: null
+dataset_type: "original"  # choices: ["original", "retrieval"]
+retrieval_identity_path: null
+dataset_name1: null
+dataset_name2: null
+dataset_name3: null
+dataset_type1: "original"  # choices: ["original", "retrieval"]
+dataset_type2: "original"
+dataset_type3: "original"
+retrieval_identity_path1: null
+retrieval_identity_path2: null
+retrieval_identity_path3: null
+object_localization_skip_special_tokens: false
+balance_num_objects: false
+
+# Inference settings
+inference_split: "eval"
+num_batches: 1
+text_image_linking: "postfuse"
+freeze_postfuse_module: false
