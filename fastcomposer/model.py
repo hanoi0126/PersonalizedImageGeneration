@@ -191,8 +191,8 @@ class FastComposerTextEncoder(CLIPPreTrainedModel):
     _build_causal_attention_mask = CLIPTextTransformer._build_causal_attention_mask
 
     @staticmethod
-    def from_pretrained(model_name_or_path, **kwargs):
-        model = CLIPTextModel.from_pretrained(model_name_or_path, **kwargs)
+    def from_pretrained(model_name_or_path, **kwcfg):
+        model = CLIPTextModel.from_pretrained(model_name_or_path, **kwcfg)
         text_model = model.text_model
         return FastComposerTextEncoder(text_model)
 
@@ -415,7 +415,7 @@ def get_object_localization_loss(
 
 
 class FastComposerModel(nn.Module):
-    def __init__(self, text_encoder, image_encoder, vae, unet, args):
+    def __init__(self, text_encoder, image_encoder, vae, unet, cfg):
         super().__init__()
         self.text_encoder = text_encoder
         self.image_encoder = image_encoder
@@ -423,14 +423,14 @@ class FastComposerModel(nn.Module):
         self.unet = unet
         self.use_ema = False
         self.ema_param = None
-        self.pretrained_model_name_or_path = args.pretrained_model_name_or_path
-        self.revision = args.revision
-        self.non_ema_revision = args.non_ema_revision
-        self.object_localization = args.object_localization
-        self.object_localization_weight = args.object_localization_weight
-        self.localization_layers = args.localization_layers
-        self.mask_loss = args.mask_loss
-        self.mask_loss_prob = args.mask_loss_prob
+        self.pretrained_model_name_or_path = cfg.pretrained_model_path
+        self.revision = cfg.revision
+        self.non_ema_revision = cfg.non_ema_revision
+        self.object_localization = cfg.object_localization
+        self.object_localization_weight = cfg.object_localization_weight
+        self.localization_layers = cfg.localization_layers
+        self.mask_loss = cfg.mask_loss
+        self.mask_loss_prob = cfg.mask_loss_prob
 
         embed_dim = text_encoder.config.hidden_size
 
@@ -442,8 +442,8 @@ class FastComposerModel(nn.Module):
                 self.unet, self.cross_attention_scores, self.localization_layers
             )
             self.object_localization_loss_fn = BalancedL1Loss(
-                args.object_localization_threshold,
-                args.object_localization_normalize,
+                cfg.object_localization_threshold,
+                cfg.object_localization_normalize,
             )
 
     def _clear_cross_attention_scores(self):
@@ -455,25 +455,25 @@ class FastComposerModel(nn.Module):
         gc.collect()
 
     @staticmethod
-    def from_pretrained(args):
+    def from_pretrained(cfg):
         text_encoder = FastComposerTextEncoder.from_pretrained(
-            args.pretrained_model_name_or_path,
+            cfg.pretrained_model_path,
             subfolder="text_encoder",
-            revision=args.revision,
+            revision=cfg.revision,
         )
         vae = AutoencoderKL.from_pretrained(
-            args.pretrained_model_name_or_path, subfolder="vae", revision=args.revision
+            cfg.pretrained_model_path, subfolder="vae", revision=cfg.revision
         )
         unet = UNet2DConditionModel.from_pretrained(
-            args.pretrained_model_name_or_path,
+            cfg.pretrained_model_path,
             subfolder="unet",
-            revision=args.non_ema_revision,
+            revision=cfg.non_ema_revision,
         )
         image_encoder = FastComposerCLIPImageEncoder.from_pretrained(
-            args.image_encoder_name_or_path,
+            cfg.image_encoder_name_or_path,
         )
 
-        return FastComposerModel(text_encoder, image_encoder, vae, unet, args)
+        return FastComposerModel(text_encoder, image_encoder, vae, unet, cfg)
 
     def to_pipeline(self):
         pipe = StableDiffusionPipeline.from_pretrained(

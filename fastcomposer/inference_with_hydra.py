@@ -15,26 +15,26 @@ from fastcomposer.pipeline import (
     stable_diffusion_call_with_references_delayed_conditioning,
 )
 from fastcomposer.transforms import get_object_transforms
-from fastcomposer.utils import parse_args
+from omegaconf import DictConfig, OmegaConf
 
 
-# @hydra.main(config_path="configs", config_name="config")
+@hydra.main(version_base=None, config_path="../configs", config_name="config")
 @torch.no_grad()
-def main():
-    args = parse_args()
+def main(cfg: DictConfig) -> None:
+
     accelerator = Accelerator(
-        mixed_precision=args.mixed_precision,
+        mixed_precision=cfg.mixed_precision,
     )
 
     # Handle the repository creation
     if accelerator.is_main_process:
-        if args.output_dir is not None:
-            os.makedirs(args.output_dir, exist_ok=True)
+        if cfg.output_dir is not None:
+            os.makedirs(cfg.output_dir, exist_ok=True)
     accelerator.wait_for_everyone()
 
     # If passed along, set the training seed now.
-    if args.seed is not None:
-        set_seed(args.seed)
+    if cfg.seed is not None:
+        set_seed(cfg.seed)
 
     weight_dtype = torch.float32
     if accelerator.mixed_precision == "fp16":
@@ -43,22 +43,22 @@ def main():
         weight_dtype = torch.bfloat16
 
     pipe = StableDiffusionPipeline.from_pretrained(
-        args.pretrained_model_name_or_path, torch_dtype=weight_dtype
+        cfg.pretrained_model_path, torch_dtype=weight_dtype
     )
 
-    model = FastComposerModel.from_pretrained(args)
+    model = FastComposerModel.from_pretrained(cfg) # TODO: Check this
 
     ckpt_name = "pytorch_model.bin"
 
     model.load_state_dict(
-        torch.load(Path(args.finetuned_model_path) / ckpt_name, map_location="cpu")
+        torch.load(Path(cfg.finetuned_model_path) / ckpt_name, map_location="cpu")
     )
 
     model = model.to(device=accelerator.device, dtype=weight_dtype)
 
     pipe.unet = model.unet
 
-    if args.enable_xformers_memory_efficient_attention:
+    if cfg.enable_xformers_memory_efficient_attention:
         pipe.unet.enable_xformers_memory_efficient_attention()
 
     pipe.text_encoder = model.text_encoder
@@ -76,32 +76,32 @@ def main():
 
     # Set up the dataset
     tokenizer = CLIPTokenizer.from_pretrained(
-        args.pretrained_model_name_or_path,
+        cfg.pretrained_model_path,
         subfolder="tokenizer",
-        revision=args.revision,
+        revision=cfg.revision,
     )
 
-    object_transforms = get_object_transforms(args)
+    object_transforms = get_object_transforms(cfg) # TODO: Check this
 
     demo_dataset = DemoDataset(
-        test_caption=args.test_caption,
-        test_reference_folder=args.test_reference_folder,
+        test_caption=cfg.caption,
+        test_reference_folder=cfg.reference_dir,
         tokenizer=tokenizer,
         object_transforms=object_transforms,
         device=accelerator.device,
-        max_num_objects=args.max_num_objects,
+        max_num_objects=cfg.max_num_objects,
     )
 
-    image_ids = os.listdir(args.test_reference_folder)
+    image_ids = os.listdir(cfg.reference_dir)
     print(f"Image IDs: {image_ids}")
     demo_dataset.set_image_ids(image_ids)
 
     unique_token = "<|image|>"
 
-    prompt = args.test_caption
+    prompt = cfg.caption
     prompt_text_only = prompt.replace(unique_token, "")
 
-    os.makedirs(args.output_dir, exist_ok=True)
+    os.makedirs(cfg.output_dir, exist_ok=True)
 
     batch = demo_dataset.get_data()
 
@@ -134,7 +134,7 @@ def main():
     encoder_hidden_states_text_only = pipe._encode_prompt(
         prompt_text_only,
         accelerator.device,
-        args.num_images_per_prompt,
+        cfg.num_images_per_prompt,
         do_classifier_free_guidance=False,
     )
 
@@ -149,23 +149,24 @@ def main():
 
     images = pipe.inference(
         prompt_embeds=encoder_hidden_states,
-        num_inference_steps=args.inference_steps,
-        height=args.generate_height,
-        width=args.generate_width,
-        guidance_scale=args.guidance_scale,
-        num_images_per_prompt=args.num_images_per_prompt,
+        num_inference_steps=cfg.inference_steps,
+        height=cfg.generate_height,
+        width=cfg.generate_width,
+        guidance_scale=cfg.guidance_scale,
+        num_images_per_prompt=cfg.num_images_per_prompt,
         cross_attention_kwargs=cross_attention_kwargs,
         prompt_embeds_text_only=encoder_hidden_states_text_only,
-        start_merge_step=args.start_merge_step,
+        start_merge_step=cfg.start_merge_step,
     ).images
 
-    for instance_id in range(args.num_images_per_prompt):
+    for instance_id in range(cfg.num_images_per_prompt):
         images[instance_id].save(
             os.path.join(
-                args.output_dir,
+                cfg.output_dir,
                 f"output_{instance_id}.png",
             )
         )
+
 
 
 if __name__ == "__main__":

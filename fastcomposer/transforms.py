@@ -219,8 +219,8 @@ def get_test_transforms_with_segmap(args):
     return test_transforms
 
 
-def get_object_transforms(args):
-    if args.no_object_augmentation:
+def get_object_transforms(cfg):
+    if cfg.no_object_augmentation:
         pre_augmentations = []
         augmentations = []
     else:
@@ -258,7 +258,7 @@ def get_object_transforms(args):
                 (
                     "resize",
                     T.Resize(
-                        (args.object_resolution, args.object_resolution),
+                        (cfg.object_resolution, cfg.object_resolution),
                         interpolation=T.InterpolationMode.BILINEAR,
                         antialias=True,
                     ),
