@@ -16,6 +16,7 @@ torchvision = "0.14.0"
 huggingface-hub = "^0.24.7"
 python-dotenv = "^1.0.1"
 diffusers = "0.16.1"
+openai = "^1.45.0"
 
 
 [tool.poetry.group.dev.dependencies]

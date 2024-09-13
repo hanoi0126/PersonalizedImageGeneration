@@ -2,6 +2,7 @@ import os
 import types
 from pathlib import Path
 
+import hydra
 import torch
 from accelerate import Accelerator
 from accelerate.utils import set_seed
@@ -17,6 +18,7 @@ from fastcomposer.transforms import get_object_transforms
 from fastcomposer.utils import parse_args
 
 
+# @hydra.main(config_path="configs", config_name="config")
 @torch.no_grad()
 def main():
     args = parse_args()
