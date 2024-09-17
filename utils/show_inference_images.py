@@ -1,10 +1,11 @@
 import os
+
 import matplotlib.pyplot as plt
 
 
 def save_grid_image(image_dir, nrow=4):
     images = [
-        plt.imread(f"{image_dir}/{i}") 
+        plt.imread(f"{image_dir}/{i}")
         for i in os.listdir(image_dir)
         if i.endswith(".png")
     ]
@@ -22,6 +23,6 @@ def save_grid_image(image_dir, nrow=4):
 if __name__ == "__main__":
 
     # set image_dir to the directory containing the images
-    image_dir = "outputs/2024-09-17/16-36-55"
+    image_dir = "outputs/2024-09-17/18-52-50"
 
     save_grid_image(image_dir)

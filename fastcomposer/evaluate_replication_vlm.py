@@ -39,7 +39,7 @@ def generate_response_with_images(cfg: DictConfig) -> None:
         generated_image_paths = sorted(
             os.path.join(cfg.generated_image_dir, f)
             for f in os.listdir(cfg.generated_image_dir)
-            if f.endswith(".png")
+            if f.endswith(".png") and not f.startswith("grid")
         )
     else:
         generated_image_paths = [cfg.generated_image]

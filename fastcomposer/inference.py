@@ -158,7 +158,7 @@ def main(cfg: DictConfig) -> None:
             num_images_per_prompt=cfg.num_images_per_prompt,
             cross_attention_kwargs=cross_attention_kwargs,
             prompt_embeds_text_only=encoder_hidden_states_text_only,
-            start_merge_step=i*5,
+            start_merge_step=i * 5,
         ).images
 
         for instance_id in range(cfg.num_images_per_prompt):
