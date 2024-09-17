@@ -1,0 +1,45 @@
+# General Settings
+now_dir: ${now:%Y-%m-%d}/${now:%H-%M-%S}
+mixed_precision: fp16  # choices: ["no", "fp16", "bf16"]
+output_dir: outputs/${now_dir}
+seed: 42
+pretrained_model_path: models/basemodel
+finetuned_model_path: models/fastcomposer
+enable_xformers_memory_efficient_attention: false
+
+# Inference
+caption_list: 
+  - a man <|image|> and a man <|image|> are reading book together
+  - a man <|image|> and a man <|image|> wearing a red hat
+  - a man <|image|> and a man <|image|> wearing a santa hat
+  - a man <|image|> and a man <|image|> wearing a rainbow scarf
+  - a man <|image|> and a man <|image|> wearing a black top hat and a monocle
+  - a man <|image|> and a man <|image|> in a chef outfit
+  - a man <|image|> and a man <|image|> in a firefighter outfit
+  - a man <|image|> and a man <|image|> in a police outfit
+  - a man <|image|> and a man <|image|> wearing pink glasses
+  - a man <|image|> and a man <|image|> wearing a yellow shirt
+  - a man <|image|> and a man <|image|> in a purple wizard outfit
+reference_dir: data/sample
+max_num_objects: 10
+num_images_per_prompt: 1
+inference_steps: 50
+generate_height: 512
+generate_width: 512
+guidance_scale: 5
+start_merge_step: 10
+
+# Model Settings
+revision: null
+non_ema_revision: null
+object_localization: false
+object_localization_weight: 0.0
+localization_layers: 0
+mask_loss: 0.0
+mask_loss_prob: 0.0
+object_localization_threshold: 0.0
+object_localization_normalize: 0.0
+image_encoder_name_or_path: openai/clip-vit-large-patch14
+no_object_augmentation: true
+object_resolution: 224
+image_encoder_type: clip

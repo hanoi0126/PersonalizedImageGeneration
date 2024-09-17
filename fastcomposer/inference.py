@@ -81,7 +81,7 @@ def main(cfg: DictConfig) -> None:
         revision=cfg.revision,
     )
 
-    object_transforms = get_object_transforms(cfg)  # TODO: Check this
+    object_transforms = get_object_transforms(cfg)
 
     demo_dataset = DemoDataset(
         test_caption=cfg.caption,

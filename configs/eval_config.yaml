@@ -4,5 +4,5 @@ output_dir: outputs/${now_dir}
 
 
 # input
-reference_image: data/sample/einstein.png
+reference_image: data/sample/newton.png
 generated_image: outputs/2024-09-13/23-50-24/output_0.png
