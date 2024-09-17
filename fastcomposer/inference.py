@@ -147,25 +147,27 @@ def main(cfg: DictConfig) -> None:
 
     cross_attention_kwargs = {}
 
-    images = pipe.inference(
-        prompt_embeds=encoder_hidden_states,
-        num_inference_steps=cfg.inference_steps,
-        height=cfg.generate_height,
-        width=cfg.generate_width,
-        guidance_scale=cfg.guidance_scale,
-        num_images_per_prompt=cfg.num_images_per_prompt,
-        cross_attention_kwargs=cross_attention_kwargs,
-        prompt_embeds_text_only=encoder_hidden_states_text_only,
-        start_merge_step=cfg.start_merge_step,
-    ).images
+    for i in range(11):
 
-    for instance_id in range(cfg.num_images_per_prompt):
-        images[instance_id].save(
-            os.path.join(
-                cfg.output_dir,
-                f"output_{instance_id}.png",
+        images = pipe.inference(
+            prompt_embeds=encoder_hidden_states,
+            num_inference_steps=cfg.inference_steps,
+            height=cfg.generate_height,
+            width=cfg.generate_width,
+            guidance_scale=cfg.guidance_scale,
+            num_images_per_prompt=cfg.num_images_per_prompt,
+            cross_attention_kwargs=cross_attention_kwargs,
+            prompt_embeds_text_only=encoder_hidden_states_text_only,
+            start_merge_step=i*5,
+        ).images
+
+        for instance_id in range(cfg.num_images_per_prompt):
+            images[instance_id].save(
+                os.path.join(
+                    cfg.output_dir,
+                    f"output_{instance_id}_s{i*5:02}.png",
+                )
             )
-        )
 
 
 if __name__ == "__main__":

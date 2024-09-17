@@ -1,7 +1,10 @@
 import base64
 import io
+import os
 
+import hydra
 from dotenv import load_dotenv
+from omegaconf import DictConfig
 from openai import OpenAI
 from PIL import Image
 
@@ -10,12 +13,16 @@ client = OpenAI()
 
 SYSTEM_PROMPT = (
     "Do these images look like the person in the input image pasted on top?"
-    "On a scale of 1 to 5, how would you rate them?"
+    "On a scale of 0 to 5, how would you rate them?"
     "The closer to 5, the more the image looks pasted."
+    "Output 0 if the persons cannot be determined to be the same person."
+    "Please state your rationale and output the numbers at the end."
 )
 
 
 def encode_image(image: Image) -> str:
+    if image.mode == "RGBA":
+        image = image.convert("RGB")  # RGBAからRGBに変換
     byte_arr = io.BytesIO()
     image.save(byte_arr, format="JPEG")
     base64_image = (
@@ -24,27 +31,49 @@ def encode_image(image: Image) -> str:
     return base64_image
 
 
-def generate_response_with_images(images: list[Image]) -> str:
-    image_urls = [encode_image(image) for image in images]
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image_url", "image_url": {"url": image_url}}
-                    for image_url in image_urls
-                ],
-            },
-        ],
-        max_tokens=300,
-    )
-    return response.choices[0].message.content
+@hydra.main(version_base=None, config_path="../configs", config_name="eval_config")
+def generate_response_with_images(cfg: DictConfig) -> None:
+    output_text = ""
+
+    if cfg.generated_image_dir is not None:
+        generated_image_paths = sorted(
+            os.path.join(cfg.generated_image_dir, f)
+            for f in os.listdir(cfg.generated_image_dir)
+            if f.endswith(".png")
+        )
+    else:
+        generated_image_paths = [cfg.generated_image]
+
+    for idx, generated_image_path in enumerate(generated_image_paths):
+        print(f"Processing {generated_image_path}...")
+        images = [
+            Image.open(image_path)
+            for image_path in [cfg.reference_image, generated_image_path]
+        ]
+        image_urls = [encode_image(image) for image in images]
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": image_url}}
+                        for image_url in image_urls
+                    ],
+                },
+            ],
+            max_tokens=300,
+        )
+
+        result = response.choices[0].message.content
+        print(result)
+
+        output_text += f"{generated_image_path}: {result}\n"
+
+    with open(f"{cfg.output_dir}/result.txt", "w") as f:
+        f.write(output_text)
 
 
 if __name__ == "__main__":
-    input_image = Image.open("data/sample/einstein.png")
-    output_image = Image.open("outputs/sample/output_0.png")
-    response = generate_response_with_images([input_image, output_image])
-    print(response)
+    generate_response_with_images()

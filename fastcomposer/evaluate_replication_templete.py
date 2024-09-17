@@ -1,3 +1,5 @@
+import os
+
 import cv2
 import hydra
 import numpy as np
@@ -40,6 +42,7 @@ class FaceDetector:
 
 @hydra.main(version_base=None, config_path="../configs", config_name="eval_config")
 def template_matching(cfg: DictConfig) -> None:
+    output_text = ""
 
     detector = FaceDetector()
     reference_image = Image.open(cfg.reference_image)
@@ -52,24 +55,43 @@ def template_matching(cfg: DictConfig) -> None:
     template_image.save(f"{cfg.output_dir}/detected_face.png")
 
     template_image = cv2.imread(f"{cfg.output_dir}/detected_face.png")
-    generated_image = cv2.imread(cfg.generated_image)
 
-    if generated_image is None:
-        raise ValueError("生成画像が正しく読み込まれませんでした。")
+    if cfg.generated_image_dir is not None:
+        generated_image_paths = sorted(
+            os.path.join(cfg.generated_image_dir, f)
+            for f in os.listdir(cfg.generated_image_dir)
+            if f.endswith(".png")
+        )
+    else:
+        generated_image_paths = [cfg.generated_image]
 
-    h, w = template_image.shape[:2]
+    for idx, generated_image_path in enumerate(generated_image_paths):
+        print(f"Processing {generated_image_path}...")
+        generated_image = cv2.imread(generated_image_path)
 
-    result = cv2.matchTemplate(generated_image, template_image, cv2.TM_CCOEFF_NORMED)
-    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-    print("Max value:", max_val, "Max location:", max_loc)
+        if generated_image is None:
+            raise ValueError("生成画像が正しく読み込まれませんでした。")
 
-    top_left = max_loc
-    bottom_right = (top_left[0] + w, top_left[1] + h)
-    cv2.rectangle(
-        generated_image, top_left, bottom_right, thickness=4, color=(0, 255, 255)
-    )
+        h, w = template_image.shape[:2]
 
-    cv2.imwrite(f"{cfg.output_dir}/result.png", generated_image)
+        result = cv2.matchTemplate(
+            generated_image, template_image, cv2.TM_CCOEFF_NORMED
+        )
+        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+        print("Max value:", max_val, "Max location:", max_loc)
+
+        top_left = max_loc
+        bottom_right = (top_left[0] + w, top_left[1] + h)
+        cv2.rectangle(
+            generated_image, top_left, bottom_right, thickness=4, color=(0, 255, 255)
+        )
+
+        cv2.imwrite(f"{cfg.output_dir}/result_{idx:02}.png", generated_image)
+
+        output_text += f"{generated_image_path}: {max_val}\n"
+
+    with open(f"{cfg.output_dir}/result.txt", "w") as f:
+        f.write(output_text)
 
 
 if __name__ == "__main__":

@@ -1,10 +1,6 @@
 import cv2
 import hydra
-import numpy as np
-from facenet_pytorch import MTCNN
 from omegaconf import DictConfig
-from PIL import Image
-from torch import Tensor
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="eval_config")
@@ -23,7 +19,9 @@ def feature_matching(cfg: DictConfig) -> None:
 
     # マッチング結果の描画
     matches = sorted(matches, key=lambda x: x.distance)
-    img_matches = cv2.drawMatches(reference_image, kp1, generated_image, kp2, matches[:10], None, flags=2)
+    img_matches = cv2.drawMatches(
+        reference_image, kp1, generated_image, kp2, matches[:10], None, flags=2
+    )
 
     cv2.imwrite(f"{cfg.output_dir}/result.png", img_matches)
 
