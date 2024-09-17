@@ -28,6 +28,7 @@ RUN ln -sf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime && \
     libreadline-dev \
     libsqlite3-dev \
     liblzma-dev \
+    libglib2.0-0 \
     git-lfs && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 

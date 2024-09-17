@@ -1,0 +1,8 @@
+# General Settings
+now_dir: ${now:%Y-%m-%d}/${now:%H-%M-%S}
+output_dir: outputs/${now_dir}
+
+
+# input
+reference_image: data/sample/einstein.png
+generated_image: outputs/2024-09-13/23-50-24/output_0.png

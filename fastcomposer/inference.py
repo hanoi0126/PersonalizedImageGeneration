@@ -18,7 +18,7 @@ from fastcomposer.pipeline import (
 from fastcomposer.transforms import get_object_transforms
 
 
-@hydra.main(version_base=None, config_path="../configs", config_name="config")
+@hydra.main(version_base=None, config_path="../configs", config_name="infer_config")
 @torch.no_grad()
 def main(cfg: DictConfig) -> None:
 
