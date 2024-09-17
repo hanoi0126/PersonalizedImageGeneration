@@ -9,7 +9,7 @@ enable_xformers_memory_efficient_attention: false
 
 # Inference
 caption: a man <|image|> holding a glass of wine
-reference_dir: data/einstein
+reference_dir: data/newton
 max_num_objects: 10
 num_images_per_prompt: 1
 inference_steps: 50

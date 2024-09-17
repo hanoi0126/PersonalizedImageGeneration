@@ -20,6 +20,7 @@ opencv-python = "^4.10.0.84"
 facenet-pytorch = "2.5.3"
 numpy = "1.26.4"
 matplotlib = "^3.9.2"
+wandb = "^0.18.1"
 
 
 [tool.poetry.group.dev.dependencies]

@@ -23,6 +23,6 @@ def save_grid_image(image_dir, nrow=4):
 if __name__ == "__main__":
 
     # set image_dir to the directory containing the images
-    image_dir = "outputs/2024-09-17/18-52-50"
+    image_dir = "outputs/2024-09-17/19-04-15"
 
     save_grid_image(image_dir)
