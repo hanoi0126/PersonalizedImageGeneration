@@ -20,7 +20,27 @@ caption_list:
   - a man <|image|> wearing pink glasses
   - a man <|image|> wearing a yellow shirt
   - a man <|image|> in a purple wizard outfit
-reference_dir: data/newton
+  - a man <|image|> is in the jungle
+  - a man <|image|> is in the snow
+  - a man <|image|> is on the beach
+  - a man <|image|> is on a cobblestone street
+  - a man <|image|> is on top of pink fabric
+  - a man <|image|> is on top of a wooden floor
+  - a man <|image|> is with a city in the background
+  - a man <|image|> is with a mountain in the background
+  - a man <|image|> is with a blue house in the background
+  - a man <|image|> is on top of a purple rug in a forest
+  - a man <|image|> is riding a horse
+  - a man <|image|> is holding a glass of wine
+  - a man <|image|> is holding a piece of cake
+  - a man <|image|> is giving a lecture
+  - a man <|image|> is reading a book
+  - a man <|image|> is gardening in the backyard
+  - a man <|image|> is cooking a meal
+  - a man <|image|> is working out at the gym
+  - a man <|image|> is walking the dog
+  - a man <|image|> is baking cookies
+reference_dir: data/einstein
 max_num_objects: 10
 num_images_per_prompt: 1
 inference_steps: 50
