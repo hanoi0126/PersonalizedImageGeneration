@@ -21,6 +21,7 @@ facenet-pytorch = "2.5.3"
 numpy = "1.26.4"
 matplotlib = "^3.9.2"
 wandb = "^0.18.1"
+mediapipe = "^0.10.15"
 
 
 [tool.poetry.group.dev.dependencies]
