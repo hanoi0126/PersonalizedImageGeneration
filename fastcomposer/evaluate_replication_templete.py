@@ -153,7 +153,6 @@ def template_matching_for_diff_size(cfg: DictConfig) -> None:
                 loc = max_loc
                 t_h, t_w, _ = t3.shape
 
-
         result_image = cv2.rectangle(
             result_image,
             loc,
