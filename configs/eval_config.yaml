@@ -4,9 +4,9 @@ output_dir: outputs/${now_dir}
 
 
 # input
-reference_image: data/sample/newton.png
+reference_image: data/sample/einstein.png
 generated_image: outputs/2024-09-13/23-50-24/output_0.png
-generated_image_dir: outputs/2024-09-24/14-27-46
+generated_image_dir: outputs/2024-09-24/14-07-54
 
 # for vlm 
 few_shot_example: data/example/merged_image.png

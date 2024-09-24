@@ -3,6 +3,7 @@ import os
 import cv2
 import hydra
 import mediapipe as mp
+import pandas as pd
 import numpy as np
 from mediapipe import solutions
 from mediapipe.framework.formats import landmark_pb2
@@ -103,6 +104,29 @@ def main(cfg: DictConfig) -> None:
     else:
         generated_image_paths = [cfg.generated_image]
 
+    print(f"Processing {cfg.reference_image}...")
+    reference_image = cv2.imread(cfg.reference_image)
+    reference_image_rgb = cv2.cvtColor(reference_image, cv2.COLOR_BGR2RGB)
+    reference_image_mp = mp.Image(
+        image_format=mp.ImageFormat.SRGB, data=reference_image_rgb
+    )
+
+    detection_result = detector.detect(reference_image_mp)
+
+    ref_annotated_image, ref_white_background_image = draw_landmarks_on_image(
+        reference_image_rgb, detection_result
+    )
+
+    ref_annotated_image = cv2.cvtColor(ref_annotated_image, cv2.COLOR_BGR2RGB)
+    ref_white_background_image = cv2.cvtColor(ref_white_background_image, cv2.COLOR_BGR2RGB)
+
+    cv2.imwrite(f"{cfg.output_dir}/reference_landmarks.png", ref_annotated_image)
+    cv2.imwrite(f"{cfg.output_dir}/reference_landmarks_white.png", ref_white_background_image)
+
+    templete_matrix = detection_result.facial_transformation_matrixes
+
+    result_dict = {}
+
     for idx, generated_image_path in enumerate(generated_image_paths):
         print(f"Processing {generated_image_path}...")
         generated_image = cv2.imread(generated_image_path)
@@ -127,6 +151,17 @@ def main(cfg: DictConfig) -> None:
         cv2.imwrite(
             f"{cfg.output_dir}/{basename}_landmarks_white.png", white_background_image
         )
+
+        target_matrix = detection_result.facial_transformation_matrixes
+
+        print(f"Comparing {cfg.reference_image} and {generated_image_path}...")
+        difference = np.linalg.norm(templete_matrix[0] - target_matrix[0], ord='fro')
+        print(f"Difference: {difference:.4f}")
+
+        result_dict[generated_image_path] = difference
+
+    result_df = pd.DataFrame(result_dict.items(), columns=["image_path", "difference"])
+    result_df.to_csv(f"{cfg.output_dir}/result.csv", index=False)
 
 
 if __name__ == "__main__":
