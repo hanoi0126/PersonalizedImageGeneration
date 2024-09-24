@@ -1,7 +1,7 @@
 import os
 
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 
 
 def save_grid_image(image_dir, ncol=4, vlm_result=None, landmark_result=None) -> None:
@@ -12,24 +12,29 @@ def save_grid_image(image_dir, ncol=4, vlm_result=None, landmark_result=None) ->
     ]
 
     num_images = len(images)
-    nrow = (num_images +  ncol - 1) // ncol 
+    nrow = (num_images + ncol - 1) // ncol
 
-    fig_width = min(20, 5 * ncol)  
-    fig_height = min(50, 5 * nrow) 
+    fig_width = min(20, 5 * ncol)
+    fig_height = min(50, 5 * nrow)
 
     plt.figure(figsize=(fig_width, fig_height))
     for i, (filename, image) in enumerate(images):
         label = filename if vlm_result is None else f"{filename} : {vlm_result[i]}"
-        if landmark_result is not None and filename.endswith("_white.png") and not filename.startswith("reference"):
+        if (
+            landmark_result is not None
+            and filename.endswith("_white.png")
+            and not filename.startswith("reference")
+        ):
             label += f"\n{landmark_result[i // 2 - 1]:.2f}"
         plt.subplot(nrow, ncol, i + 1)
         plt.imshow(image)
         plt.title(label, fontsize=8)
         plt.axis("off")
-    
+
     plt.tight_layout()
-    plt.savefig(f"{image_dir}/grid.png", bbox_inches='tight')
+    plt.savefig(f"{image_dir}/grid.png", bbox_inches="tight")
     plt.close()
+
 
 if __name__ == "__main__":
 

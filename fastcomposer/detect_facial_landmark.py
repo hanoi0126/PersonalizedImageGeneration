@@ -119,7 +119,6 @@ if __name__ == "__main__":
     )
     templete_matrix = detection_result.facial_transformation_matrixes
 
-
     print(len(templete_matrix))
     print(templete_matrix[0].shape)
     print(templete_matrix)

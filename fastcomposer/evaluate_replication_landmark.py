@@ -3,8 +3,8 @@ import os
 import cv2
 import hydra
 import mediapipe as mp
-import pandas as pd
 import numpy as np
+import pandas as pd
 from mediapipe import solutions
 from mediapipe.framework.formats import landmark_pb2
 from mediapipe.tasks import python
@@ -118,10 +118,14 @@ def main(cfg: DictConfig) -> None:
     )
 
     ref_annotated_image = cv2.cvtColor(ref_annotated_image, cv2.COLOR_BGR2RGB)
-    ref_white_background_image = cv2.cvtColor(ref_white_background_image, cv2.COLOR_BGR2RGB)
+    ref_white_background_image = cv2.cvtColor(
+        ref_white_background_image, cv2.COLOR_BGR2RGB
+    )
 
     cv2.imwrite(f"{cfg.output_dir}/reference_landmarks.png", ref_annotated_image)
-    cv2.imwrite(f"{cfg.output_dir}/reference_landmarks_white.png", ref_white_background_image)
+    cv2.imwrite(
+        f"{cfg.output_dir}/reference_landmarks_white.png", ref_white_background_image
+    )
 
     templete_matrix = detection_result.facial_transformation_matrixes
 
@@ -155,7 +159,7 @@ def main(cfg: DictConfig) -> None:
         target_matrix = detection_result.facial_transformation_matrixes
 
         print(f"Comparing {cfg.reference_image} and {generated_image_path}...")
-        difference = np.linalg.norm(templete_matrix[0] - target_matrix[0], ord='fro')
+        difference = np.linalg.norm(templete_matrix[0] - target_matrix[0], ord="fro")
         print(f"Difference: {difference:.4f}")
 
         result_dict[generated_image_path] = difference
