@@ -85,9 +85,9 @@ def main(cfg: DictConfig) -> None:
 
     object_transforms = get_object_transforms(cfg)
 
-    for caption in cfg.caption_list:
+    for idx, caption in enumerate(cfg.caption_list):
         demo_dataset = DemoDataset(
-            test_caption=cfg.caption,
+            test_caption=caption,
             test_reference_folder=cfg.reference_dir,
             tokenizer=tokenizer,
             object_transforms=object_transforms,
@@ -101,7 +101,7 @@ def main(cfg: DictConfig) -> None:
 
         unique_token = "<|image|>"
 
-        prompt = cfg.caption
+        prompt = caption
         prompt_text_only = prompt.replace(unique_token, "")
 
         os.makedirs(cfg.output_dir, exist_ok=True)
@@ -166,7 +166,7 @@ def main(cfg: DictConfig) -> None:
             images[instance_id].save(
                 os.path.join(
                     cfg.output_dir,
-                    f"output_{instance_id}.png",
+                    f"output_{idx:03}_{instance_id:02}.png",
                 )
             )
 

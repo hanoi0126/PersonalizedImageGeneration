@@ -9,18 +9,18 @@ enable_xformers_memory_efficient_attention: false
 
 # Inference
 caption_list: 
-  - a man <|image|> and a man <|image|> are reading book together
-  - a man <|image|> and a man <|image|> wearing a red hat
-  - a man <|image|> and a man <|image|> wearing a santa hat
-  - a man <|image|> and a man <|image|> wearing a rainbow scarf
-  - a man <|image|> and a man <|image|> wearing a black top hat and a monocle
-  - a man <|image|> and a man <|image|> in a chef outfit
-  - a man <|image|> and a man <|image|> in a firefighter outfit
-  - a man <|image|> and a man <|image|> in a police outfit
-  - a man <|image|> and a man <|image|> wearing pink glasses
-  - a man <|image|> and a man <|image|> wearing a yellow shirt
-  - a man <|image|> and a man <|image|> in a purple wizard outfit
-reference_dir: data/sample
+  - a man <|image|> are reading book together
+  - a man <|image|> wearing a red hat
+  - a man <|image|> wearing a santa hat
+  - a man <|image|> wearing a rainbow scarf
+  - a man <|image|> wearing a black top hat and a monocle
+  - a man <|image|> in a chef outfit
+  - a man <|image|> in a firefighter outfit
+  - a man <|image|> in a police outfit
+  - a man <|image|> wearing pink glasses
+  - a man <|image|> wearing a yellow shirt
+  - a man <|image|> in a purple wizard outfit
+reference_dir: data/newton
 max_num_objects: 10
 num_images_per_prompt: 1
 inference_steps: 50

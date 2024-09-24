@@ -11,21 +11,8 @@ from PIL import Image
 load_dotenv()
 client = OpenAI()
 
-SYSTEM_PROMPT = (
-    "Do these images look like the person in the input image pasted on top?\n"
-    "Please categorize each image into one of the following three groups:\n"
-    "1. The person appears to be the same, but the image does not look pasted (natural differences in facial expression, orientation, etc.)\n"
-    "2. The person appears to be the same, but the image looks pasted (identical facial expression, highly similar orientation)\n"
-    "3. The person does not appear to be the same\n"
-    "Provide your reasoning for the categorization.\n"
-    "Output the results in the following json format and do not output any string other than json:\n"
-    """
-    {
-        'group': 1,
-        'reason': 'The same person is depicted, but the facial expression and the direction of the face are so different that it cannot be called a paste.'
-    }
-    """
-)
+
+SYSTEM_PROMPT = "please explain about the image in detail\n"
 
 
 def encode_image(image: Image) -> str:
@@ -70,10 +57,6 @@ def generate_response_with_images(cfg: DictConfig) -> None:
                     "content": [
                         {"type": "image_url", "image_url": {"url": example_url}}
                     ],
-                },
-                {
-                    "role": "assistant",
-                    "content": "Here is an example image. This corresponds to 5.",
                 },
                 {
                     "role": "user",
