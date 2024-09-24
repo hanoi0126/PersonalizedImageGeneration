@@ -106,7 +106,6 @@ def generate_response_with_images(cfg: DictConfig) -> None:
                     print("JSON decode error")
                     continue
 
-
     with open(f"{cfg.output_dir}/result.txt", "w") as f:
         f.write(output_text)
 
