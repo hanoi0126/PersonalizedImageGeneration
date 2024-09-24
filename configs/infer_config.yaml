@@ -8,7 +8,8 @@ finetuned_model_path: models/fastcomposer
 enable_xformers_memory_efficient_attention: false
 
 # Inference
-caption: a man <|image|> holding a glass of wine
+# caption: a man <|image|> holding a glass of wine
+caption: man in the snow, happy
 reference_dir: data/newton
 max_num_objects: 10
 num_images_per_prompt: 1

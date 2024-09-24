@@ -9,7 +9,7 @@ enable_xformers_memory_efficient_attention: false
 
 # Inference
 caption_list: 
-  - a man <|image|> are reading book together
+  - a man <|image|> are reading book
   - a man <|image|> wearing a red hat
   - a man <|image|> wearing a santa hat
   - a man <|image|> wearing a rainbow scarf
@@ -27,7 +27,7 @@ inference_steps: 50
 generate_height: 512
 generate_width: 512
 guidance_scale: 5
-start_merge_step: 10
+start_merge_step: 0
 
 # Model Settings
 revision: null

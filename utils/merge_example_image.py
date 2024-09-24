@@ -1,23 +1,40 @@
 import matplotlib.pyplot as plt
 from PIL import Image
 
-if __name__ == "__main__":
-    ex_input = Image.open("data/example/sample_input.png")
-    ex_output = Image.open("data/example/sample_output.png")
-    ex_input = ex_input.resize((256, 256))
-    ex_output = ex_output.resize((256, 256))
 
-    plt.figure(figsize=(10, 5))
-    plt.subplot(1, 2, 1)
-    plt.imshow(ex_input)
-    plt.axis("off")
-    plt.title("Input Image")
+def merge_images(
+    input_path, good_output_path, replicate_output_path, bad_output_path, output_path
+):
+    # 画像を読み込み、リサイズする
+    images = {
+        "Input": Image.open(input_path),
+        "1 : Good Output": Image.open(good_output_path),
+        "2 : Replicate Output": Image.open(replicate_output_path),
+        "3 : Bad Output": Image.open(bad_output_path),
+    }
+    for key in images:
+        images[key] = images[key].resize((256, 256))
 
-    plt.subplot(1, 2, 2)
-    plt.imshow(ex_output)
-    plt.axis("off")
-    plt.title("Output Image")
+    # 2x2のサブプロットを作成
+    fig, axs = plt.subplots(2, 2, figsize=(12, 12))
+    fig.suptitle("Image Comparison", fontsize=16)
+
+    # 各サブプロットに画像を配置
+    for ax, (title, img) in zip(axs.flatten(), images.items()):
+        ax.imshow(img)
+        ax.axis("off")
+        ax.set_title(title)
 
     plt.tight_layout()
-    plt.savefig("data/example/merged_image.png")
+    plt.savefig(output_path, dpi=300, bbox_inches="tight")
     plt.close()
+
+
+if __name__ == "__main__":
+    merge_images(
+        input_path="data/example/sample_input.png",
+        good_output_path="data/example/sample_good_output.png",
+        replicate_output_path="data/example/sample_replicate_output.png",
+        bad_output_path="data/example/sample_bad_output.png",
+        output_path="data/example/merged_image.png",
+    )

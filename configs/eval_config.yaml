@@ -6,7 +6,7 @@ output_dir: outputs/${now_dir}
 # input
 reference_image: data/sample/newton.png
 generated_image: outputs/2024-09-13/23-50-24/output_0.png
-generated_image_dir: outputs/2024-09-24/02-16-27
+generated_image_dir: outputs/2024-09-24/14-27-46
 
 # for vlm 
 few_shot_example: data/example/merged_image.png
