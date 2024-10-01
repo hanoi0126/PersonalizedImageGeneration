@@ -5,6 +5,7 @@ import json
 import os
 import re
 
+import google.generativeai as genai
 import hydra
 from dotenv import load_dotenv
 from omegaconf import DictConfig
@@ -12,7 +13,12 @@ from openai import OpenAI
 from PIL import Image
 
 load_dotenv()
+
+# setting of OpenAI
 client = OpenAI()
+
+# setting of Google Cloud
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 SYSTEM_PROMPT = (
     "Do these images look like the person in the input image pasted on top?\n"
@@ -24,7 +30,7 @@ SYSTEM_PROMPT = (
     "Output the results in the following json format and do not output any string other than json:\n"
     """
     {
-        'categgory': 1,
+        'category': 1,
         'reason': 'The same person is depicted, but the facial expression and the direction of the face are so different that it cannot be called a paste.'
     }
     """
@@ -40,6 +46,52 @@ def encode_image(image: Image) -> str:
         f"data:image/jpeg;base64,{base64.b64encode(byte_arr.getvalue()).decode()}"
     )
     return base64_image
+
+
+def inference(model_name: str, example_image: Image, images: list[Image]) -> None:
+    if model_name.startswith("gpt"):
+        example_url = encode_image(example_image)
+        image_urls = [encode_image(image) for image in images]
+
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": [{"type": "image_url", "image_url": {"url": example_url}}],
+            },
+            {
+                "role": "assistant",
+                "content": "Here is an example image. Prease refer to this image when answering the question.",
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": image_url}}
+                    for image_url in image_urls
+                ],
+            },
+        ]
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=messages,
+            max_tokens=300,
+        )
+        result = response.choices[0].message.content
+
+    elif model_name.startswith("gemini"):
+        model = genai.GenerativeModel(f"models/{model_name}")
+        content = [
+            SYSTEM_PROMPT,
+            example_image,
+            "Here is an example image. Prease refer to this image when answering the question.",
+        ] + images
+        response = model.generate_content(content)
+        result = response.text
+
+    else:
+        raise ValueError(f"Invalid model name: {model_name}")
+
+    return result
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="eval_config")
@@ -63,35 +115,9 @@ def generate_response_with_images(cfg: DictConfig) -> None:
             Image.open(image_path)
             for image_path in [cfg.reference_image, generated_image_path]
         ]
-        example_url = encode_image(example_image)
-        image_urls = [encode_image(image) for image in images]
-        for i in range(cfg.request_for_image):
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "image_url", "image_url": {"url": example_url}}
-                        ],
-                    },
-                    {
-                        "role": "assistant",
-                        "content": "Here is an example image. Prease refer to this image when answering the question.",
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "image_url", "image_url": {"url": image_url}}
-                            for image_url in image_urls
-                        ],
-                    },
-                ],
-                max_tokens=300,
-            )
 
-            result = response.choices[0].message.content
+        for i in range(cfg.request_for_image):
+            result = inference(cfg.model, example_image, images)
             print(result)
 
             output_text += f"{generated_image_path}_{i:02}: {result}\n"

@@ -1,3 +1,4 @@
+import math
 import os
 
 import cv2
@@ -10,6 +11,32 @@ from mediapipe.framework.formats import landmark_pb2
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from omegaconf import DictConfig
+
+
+def calculate_landmark_distances(landmarks1, landmarks2):
+    """
+    2つの画像のランドマークデータ間の距離を計算する。
+
+    Args:
+        landmarks1 (list of NormalizedLandmark): 1つ目の画像のランドマークリスト (長さが478)
+        landmarks2 (list of NormalizedLandmark): 2つ目の画像のランドマークリスト (長さが478)
+
+    Returns:
+        list of float: 各対応するランドマーク間のユークリッド距離を格納したリスト
+    """
+    assert len(landmarks1) == len(landmarks2), ValueError(
+        f"2つのランドマークリストの長さが一致していません。{len(landmarks1)} != {len(landmarks2)}"
+    )
+
+    distances = []
+    for lm1, lm2 in zip(landmarks1, landmarks2):
+        # ユークリッド距離を計算
+        distance = math.sqrt(
+            (lm1.x - lm2.x) ** 2 + (lm1.y - lm2.y) ** 2 + (lm1.z - lm2.z) ** 2
+        )
+        distances.append(distance)
+
+    return sum(distances) / len(distances)
 
 
 def draw_landmarks_on_image(rgb_image, detection_result):
@@ -127,7 +154,8 @@ def main(cfg: DictConfig) -> None:
         f"{cfg.output_dir}/reference_landmarks_white.png", ref_white_background_image
     )
 
-    templete_matrix = detection_result.facial_transformation_matrixes
+    # templete_matrix = detection_result.facial_transformation_matrixes
+    template_landmark = detection_result.face_landmarks[0]
 
     result_dict = {}
 
@@ -156,13 +184,17 @@ def main(cfg: DictConfig) -> None:
             f"{cfg.output_dir}/{basename}_landmarks_white.png", white_background_image
         )
 
-        target_matrix = detection_result.facial_transformation_matrixes
+        # target_matrix = detection_result.facial_transformation_matrixes
+        target_landmark = detection_result.face_landmarks[0]
+        distance = calculate_landmark_distances(template_landmark, target_landmark)
+        print(f"Distance: {distance:.4f}")
 
         print(f"Comparing {cfg.reference_image} and {generated_image_path}...")
-        difference = np.linalg.norm(templete_matrix[0] - target_matrix[0], ord="fro")
-        print(f"Difference: {difference:.4f}")
+        # difference = np.linalg.norm(templete_matrix[0] - target_matrix[0], ord="fro")
+        # print(f"Difference: {difference:.4f}")
 
-        result_dict[generated_image_path] = difference
+        # result_dict[generated_image_path] = difference
+        result_dict[generated_image_path] = distance
 
     result_df = pd.DataFrame(result_dict.items(), columns=["image_path", "difference"])
     result_df.to_csv(f"{cfg.output_dir}/result.csv", index=False)

@@ -4,10 +4,11 @@ output_dir: outputs/${now_dir}
 
 
 # input
-reference_image: data/sample/einstein2.png
+reference_image: data/sample/einstein.png
 generated_image: outputs/2024-09-13/23-50-24/output_0.png
 generated_image_dir: outputs/2024-09-24/20-42-05
 
 # for vlm 
 few_shot_example: data/example/merged_image.png
 request_for_image: 3
+model: gemini-1.5-pro-latest # gpt-4o, gemini-1.5-flash-latest, gemini-1.5-pro-latest

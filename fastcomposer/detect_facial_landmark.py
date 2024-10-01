@@ -117,8 +117,11 @@ if __name__ == "__main__":
     cv2.imwrite(
         f"data/facial-detection/{basename}_landmarks_white.png", white_background_image
     )
+
     templete_matrix = detection_result.facial_transformation_matrixes
 
     print(len(templete_matrix))
     print(templete_matrix[0].shape)
     print(templete_matrix)
+
+    print(len(detection_result.face_landmarks[0]))
