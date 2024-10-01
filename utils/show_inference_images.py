@@ -39,7 +39,7 @@ def save_grid_image(image_dir, ncol=4, vlm_result=None, landmark_result=None) ->
 if __name__ == "__main__":
 
     # set image_dir to the directory containing the images
-    image_dir = "outputs/2024-10-01/14-16-01"
+    image_dir = "outputs/2024-09-24/20-36-14"
 
     # set vlm_result to the list of categories predicted by the model
     # vlm_result_csv = "outputs/2024-09-24/14-32-05/result.csv"
@@ -48,9 +48,9 @@ if __name__ == "__main__":
     vlm_result = None
 
     # set landmark result to the list of landmarks predicted by the model
-    landmark_result_csv = "outputs/2024-10-01/14-16-01/result.csv"
-    landmark_result_df = pd.read_csv(landmark_result_csv)
-    landmark_result = landmark_result_df["difference"].tolist()
-    # landmark_result = None
+    # landmark_result_csv = "outputs/2024-10-01/14-16-01/result.csv"
+    # landmark_result_df = pd.read_csv(landmark_result_csv)
+    # landmark_result = landmark_result_df["difference"].tolist()
+    landmark_result = None
 
     save_grid_image(image_dir, vlm_result=vlm_result, landmark_result=landmark_result)
