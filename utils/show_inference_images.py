@@ -1,7 +1,6 @@
 import os
 
 import matplotlib.pyplot as plt
-import pandas as pd
 
 
 def save_grid_image(image_dir, ncol=4, vlm_result=None, landmark_result=None) -> None:
