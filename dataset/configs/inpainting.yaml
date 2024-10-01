@@ -1,0 +1,9 @@
+# General Settings
+now_dir: ${now:%Y-%m-%d}/${now:%H-%M-%S}
+output_dir: outputs/${now_dir}
+
+model_name: kandinsky-community/kandinsky-2-2-decoder-inpaint
+init_image: /workspace/data/einstein/einstein.png
+mask_image: /workspace/data/inpaint_mask/einstein_mask.png
+prompt: a man wearing a yellow shirt
+negative_prompt: worst quality

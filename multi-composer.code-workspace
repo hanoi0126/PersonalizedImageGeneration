@@ -1,0 +1,11 @@
+{
+    "folders": [
+      {
+        "name": "multi-composer",
+        "path": "."
+      },
+      {
+        "path": "./dataset"
+      },
+    ],
+}
