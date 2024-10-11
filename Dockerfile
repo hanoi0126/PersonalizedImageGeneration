@@ -47,7 +47,7 @@ RUN git clone --depth=1 https://github.com/pyenv/pyenv.git $PYENV_ROOT && \
 ENV POETRY_HOME="/root/.local" \
     PATH="$POETRY_HOME/bin:$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH"
 
-RUN curl -sSL https://install.python-poetry.org | python3 - 
+RUN curl -sSL https://install.python-poetry.org | python3 -
 
 # Pythonのパスを追加
 ENV PYTHONPATH=/workspace:$PYTHONPATH \

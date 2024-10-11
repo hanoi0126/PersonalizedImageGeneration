@@ -39,7 +39,7 @@ def save_grid_image(image_dir, ncol=4, vlm_result=None, landmark_result=None) ->
 if __name__ == "__main__":
 
     # set image_dir to the directory containing the images
-    image_dir = "outputs/2024-09-24/20-36-14"
+    image_dir = "outputs/2024-10-08/15-12-14"
 
     # set vlm_result to the list of categories predicted by the model
     # vlm_result_csv = "outputs/2024-09-24/14-32-05/result.csv"

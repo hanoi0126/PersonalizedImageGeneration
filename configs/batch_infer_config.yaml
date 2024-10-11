@@ -40,14 +40,14 @@ caption_list:
   - a man <|image|> is working out at the gym
   - a man <|image|> is walking the dog
   - a man <|image|> is baking cookies
-reference_dir: data/einstein
+reference_dir: data/celeba/000023
 max_num_objects: 10
 num_images_per_prompt: 1
 inference_steps: 50
 generate_height: 512
 generate_width: 512
 guidance_scale: 5
-start_merge_step: 0
+start_merge_step: 50
 
 # Model Settings
 revision: null
