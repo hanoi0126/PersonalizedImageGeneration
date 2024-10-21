@@ -24,7 +24,7 @@ wandb = "^0.18.1"
 mediapipe = "^0.10.15"
 pandas = "^2.2.3"
 google-generativeai = "^0.8.2"
-
+huggingface-hub = "0.16.4"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.8.0"

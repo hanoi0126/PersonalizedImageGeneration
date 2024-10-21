@@ -7,7 +7,7 @@ import pandas as pd
 def save_grid_image(image_dir, ncol=4, vlm_result=None, landmark_result=None) -> None:
     images = [
         (i, plt.imread(f"{image_dir}/{i}"))
-        for i in os.listdir(image_dir)
+        for i in sorted(os.listdir(image_dir))
         if i.endswith(".png") and not i.startswith("grid")
     ]
 
@@ -39,7 +39,7 @@ def save_grid_image(image_dir, ncol=4, vlm_result=None, landmark_result=None) ->
 if __name__ == "__main__":
 
     # set image_dir to the directory containing the images
-    image_dir = "outputs/2024-10-08/15-12-14"
+    image_dir = "data/celeba_inpaint2"
 
     # set vlm_result to the list of categories predicted by the model
     # vlm_result_csv = "outputs/2024-09-24/14-32-05/result.csv"

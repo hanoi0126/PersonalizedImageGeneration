@@ -218,3 +218,16 @@ def get_object_transforms(cfg):
         )
     )
     return object_transforms
+
+
+def get_train_transforms_with_segmap(args):
+    train_transforms = TrainTransformWithSegmap(args)
+    return train_transforms
+
+
+def get_object_processor(args):
+    if args.object_background_processor == "random":
+        object_processor = RandomSegmentProcessor()
+    else:
+        raise ValueError(f"Unknown object processor: {args.object_processor}")
+    return object_processor

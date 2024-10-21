@@ -1,0 +1,123 @@
+# file path
+now_dir: ${now:%Y-%m-%d}/${now:%H-%M-%S}
+output_dir: outputs/${now_dir}
+logging_dir: outputs/${now_dir}/logs
+
+# others
+seed: 42
+mixed_precision: fp16 # [no, fp8, fp16, bf16]
+arrow_tf32: True
+report_to: wandb
+is_main_process:
+object_types: person
+
+# debug
+max_train_samples: 100
+
+# training
+train_batch_size: 16
+num_train_epochs: 100 # 150000
+max_train_steps: 150000 # 150000
+gradient_accumulation_steps: 1
+gradient_checkpointing: True
+
+train_resolution: 512
+object_resolution: 224
+text_image_linking: postfuse
+object_appear_prob: 0.9
+uncondition_prob: 0.1
+object_background_processor: random
+desable_flashattention: True
+
+mask_loss: True
+mask_loss_prob: 0.5
+
+object_localization: True
+object_localization_weight: 1e-3
+object_localization_loss: balanced_l1
+object_localization_threshold: 1.0
+object_localization_normalize: False
+
+train_image_encoder:
+disable_flashattention:
+
+# dataset
+dataset_name: data/ffhq_wild_files
+num_image_tokens: 1
+max_num_objects: 4
+min_num_objects: 
+image_column: image
+caption_column: caption
+
+use_ema:
+enable_xformers_memory_efficient_attention:
+allow_tf32:
+no_object_augmentation:
+balance_num_objects:
+
+# model
+pretrained_model_path: models/basemodel
+revision: None
+load_model: 
+image_encoder_type: clip
+image_encoder_name_or_path: openai/clip-vit-large-patch14
+non_ema_revision: None
+freeze_postfuse_module:
+
+train_text_encoder: True
+image_encoder_trainable_layers: 2
+localization_layers: 5
+text_only_prob: 0
+
+# optimizer
+adam_beta1: 0.9
+adam_beta2: 0.999
+adam_weight_decay: 1e-2
+adam_epsilon: 1e-8
+
+# lr
+learning_rate: 1e-5
+unet_lr_scale: 1.0
+scale_lr: False
+lr_scheduler: constant
+lr_warmup_steps: 500
+
+# checkpoint
+checkpointing_steps: 200
+keep_only_last_checkpoint: True
+keep_interval: 10000
+resume_from_checkpoint: latest
+
+variance_type:
+dynamic_thresholding_ratio:
+clip_sample_range:
+prediction_type:
+thresholding:
+sample_max_value:
+
+scaling_factor:
+
+mid_block_only_cross_attention:
+cross_attention_normmid_block_only_cross_attention:
+time_embedding_dimmid_block_only_cross_attention:
+upcast_attentionmid_block_only_cross_attention:
+resnet_skip_time_actmid_block_only_cross_attention:
+mid_block_typemid_block_only_cross_attention:
+time_embedding_typemid_block_only_cross_attention:
+dual_cross_attentionmid_block_only_cross_attention:
+mid_block_mid_block_only_cross_attention:
+addition_embed_type_num_headsmid_block_only_cross_attention:
+resnet_time_scale_shiftmid_block_only_cross_attention:
+conv_out_kernelmid_block_only_cross_attention:
+conv_in_kernelmid_block_only_cross_attention:
+class_embeddings_concatmid_block_only_cross_attention:
+use_linear_projectionmid_block_only_cross_attention:
+class_embed_typemid_block_only_cross_attention:
+encoder_hid_dimmid_block_only_cross_attention:
+resnet_out_scale_factormid_block_only_cross_attention:
+time_embedding_act_fnmid_block_only_cross_attention:
+projection_class_embeddings_input_dimmid_block_only_cross_attention:
+timestep_post_actmid_block_only_cross_attention:
+num_class_embedsmid_block_only_cross_attention:
+time_cond_proj_dimmid_block_only_cross_attention:
+addition_embed_type:
