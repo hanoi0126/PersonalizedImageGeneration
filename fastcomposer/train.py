@@ -5,6 +5,7 @@ import shutil
 import sys
 import time
 from pathlib import Path
+from datetime import datetime
 
 import wandb
 import diffusers
@@ -32,7 +33,8 @@ from fastcomposer.transforms import (
 
 logger = get_logger(__name__)
 
-wandb.init(project="personalization-training", entity="hiroto-weblab")
+#set datatime
+wandb.init(project="personalization-training", entity="hiroto-weblab", name=datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
 
 @hydra.main(version_base=None, config_path="../configs", config_name="train_config")
 def train(cfg: DictConfig) -> None:
