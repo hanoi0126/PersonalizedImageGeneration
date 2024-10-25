@@ -30,7 +30,7 @@ RUN ln -sf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime && \
     liblzma-dev \
     libglib2.0-0 \
     git-lfs && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    apt-get clean && rm -rf /var/lib/apt/lists/* 
 
 # pyenvインストールおよびPythonバージョンの設定
 ARG PYENV_ROOT="/root/.pyenv"
@@ -50,7 +50,7 @@ ENV POETRY_HOME="/root/.local" \
 RUN curl -sSL https://install.python-poetry.org | python3 -
 
 # Pythonのパスを追加
-ENV PYTHONPATH=/workspace:$PYTHONPATH \
+ENV PYTHONPATH="/workspace:$PYTHONPATH" \
     PATH="/root/.local/bin:$PATH"
 
 # プロジェクトファイルをコピーしてPoetryで依存関係をインストール
