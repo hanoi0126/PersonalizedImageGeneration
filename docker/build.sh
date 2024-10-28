@@ -2,4 +2,4 @@
 
 IMAGE_NAME="multi-composer"
 
-docker build -t $IMAGE_NAME .
+docker build -t $IMAGE_NAME ./MultiComposer

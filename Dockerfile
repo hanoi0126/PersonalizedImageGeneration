@@ -9,6 +9,7 @@ RUN ln -sf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime && \
     apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
+    tmux \
     build-essential \
     ca-certificates \
     curl \
@@ -29,7 +30,6 @@ RUN ln -sf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime && \
     libsqlite3-dev \
     liblzma-dev \
     libglib2.0-0 \
-    git-lfs && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # pyenvインストールおよびPythonバージョンの設定

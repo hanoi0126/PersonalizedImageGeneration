@@ -24,12 +24,11 @@ SYSTEM_PROMPT = (
     "Evaluate the generated images based on how well they maintain the identity of the person in the input image without showing obvious copy-paste artifacts. "
     "For each image, assign one of the following categories and provide a reason for your choice:"
     "Natural variation: The person depicted in the image appears to be the same individual as in the input image, but natural variations in expression, pose, or context (e.g., smile, head tilt) make it look different in a realistic manner."
-    "Replication (copy-paste effect): The person’s face appears to be the same as in the input image, but the image shows clear signs of copying (e.g., face cut-and-paste effect, poor blending with new elements like background or clothing)."
-    "Different identity: The person in the image does not appear to be the same individual as in the input image. The facial features, proportions, or overall appearance are significantly different."
+    "Replication (copy-paste effect): The person’s face appears to be the same as in the input image, but the image shows clear signs of copying (e.g., expression is exactly the same as in the reference image, with no change)."
     "Please provide your reasoning for each category using the following JSON format:"
     """
     {
-        "category": [1, 2, or 3],
+        "category": [1, or 2],
         "reason": "Detailed explanation of why the image was categorized as such, referencing specific differences or similarities in expression, pose, or artifacts."
     }
     """

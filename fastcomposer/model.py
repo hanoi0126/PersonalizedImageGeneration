@@ -383,7 +383,7 @@ def get_object_localization_loss(
 
 
 class FastComposerModel(nn.Module):
-    def __init__(self, text_encoder, image_encoder, vae, unet, cfg):
+    def __init__(self, text_encoder: FastComposerTextEncoder, image_encoder, vae, unet, cfg):
         super().__init__()
         self.text_encoder = text_encoder
         self.image_encoder = image_encoder
@@ -394,11 +394,11 @@ class FastComposerModel(nn.Module):
         self.pretrained_model_name_or_path = cfg.pretrained_model_path
         self.revision = cfg.revision
         self.non_ema_revision = cfg.non_ema_revision
-        self.object_localization = cfg.object_localization
-        self.object_localization_weight = cfg.object_localization_weight
+        self.object_localization: bool = cfg.object_localization
+        self.object_localization_weight: float = cfg.object_localization_weight
         self.localization_layers = cfg.localization_layers
-        self.mask_loss = cfg.mask_loss
-        self.mask_loss_prob = cfg.mask_loss_prob
+        self.mask_loss: bool = cfg.mask_loss
+        self.mask_loss_prob: float = cfg.mask_loss_prob
 
         embed_dim = text_encoder.config.hidden_size
 
