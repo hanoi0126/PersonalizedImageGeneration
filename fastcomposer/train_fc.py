@@ -6,7 +6,6 @@ import sys
 import time
 from pathlib import Path
 
-import wandb
 import diffusers
 import hydra
 import torch
@@ -22,6 +21,7 @@ from omegaconf import DictConfig, OmegaConf
 from tqdm.auto import tqdm
 from transformers import CLIPTokenizer
 
+import wandb
 from fastcomposer.data import FastComposerDataset, get_data_loader
 from fastcomposer.model import FastComposerModel
 from fastcomposer.transforms import (
@@ -33,6 +33,7 @@ from fastcomposer.transforms import (
 logger = get_logger(__name__)
 
 wandb.init(project="personalization-training", entity="hiroto-weblab")
+
 
 @hydra.main(version_base=None, config_path="../configs", config_name="train_config")
 def train(cfg: DictConfig) -> None:

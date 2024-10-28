@@ -383,7 +383,9 @@ def get_object_localization_loss(
 
 
 class FastComposerModel(nn.Module):
-    def __init__(self, text_encoder: FastComposerTextEncoder, image_encoder, vae, unet, cfg):
+    def __init__(
+        self, text_encoder: FastComposerTextEncoder, image_encoder, vae, unet, cfg
+    ):
         super().__init__()
         self.text_encoder = text_encoder
         self.image_encoder = image_encoder
