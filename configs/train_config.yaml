@@ -3,6 +3,10 @@ now_dir: ${now:%Y-%m-%d}/${now:%H-%M-%S}
 output_dir: outputs/${now_dir}
 logging_dir: outputs/${now_dir}/logs
 
+# custom
+face_separation: True
+face_separation_weight: 1
+
 # others
 seed: 42
 mixed_precision: fp16 # [no, fp8, fp16, bf16]
@@ -15,7 +19,7 @@ object_types: person
 max_train_samples: 100
 
 # training
-train_batch_size: 1 # 16
+train_batch_size: 4
 num_train_epochs: 100 # 150000
 max_train_steps: 150000 # 150000
 gradient_accumulation_steps: 1

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-IMAGE_NAME="multi-composer"
-CONTAINER_NAME="multi-composer"
+IMAGE_NAME="personalization"
+CONTAINER_NAME="personalization"
 GPU_NUMBER=""
 USE_ALL_GPUS=false
 CMD="/bin/bash"
@@ -39,19 +39,19 @@ else
     CONTAINER_NAME="${CONTAINER_NAME}-${GPU_NUMBER}"
 fi
 
-echo "$(pwd)/MultiComposer:/workspace"
+echo "$(pwd)/PersonalizedImageGeneration:/workspace"
 
 # Run the docker command
 if [ "$USE_ALL_GPUS" = true ]; then
     docker run -it --gpus all \
-        -v $(pwd)/MultiComposer:/workspace \
+        -v $(pwd)/PersonalizedImageGeneration:/workspace \
         --ipc=host \
         --name $CONTAINER_NAME \
         $IMAGE_NAME \
         $CMD
 else
     docker run -it --gpus device=$GPU_NUMBER \
-        -v $(pwd)/MultiComposer:/workspace \
+        -v $(pwd)/PersonalizedImageGeneration:/workspace \
         --ipc=host \
         --name $CONTAINER_NAME \
         $IMAGE_NAME \

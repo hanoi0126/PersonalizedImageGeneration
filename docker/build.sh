@@ -1,5 +1,5 @@
 #!/bin/bash
 
-IMAGE_NAME="multi-composer"
+IMAGE_NAME="personalization"
 
 docker build -t $IMAGE_NAME ./MultiComposer

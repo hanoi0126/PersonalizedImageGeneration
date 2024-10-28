@@ -10,6 +10,8 @@ import torchvision.transforms as T
 from diffusers import AutoencoderKL, StableDiffusionPipeline, UNet2DConditionModel
 from transformers import CLIPTextModel
 from transformers.modeling_outputs import BaseModelOutputWithPooling
+
+from facenet_pytorch import MTCNN
 from transformers.models.clip.modeling_clip import (
     CLIPModel,
     CLIPPreTrainedModel,
@@ -399,8 +401,12 @@ class FastComposerModel(nn.Module):
         self.object_localization: bool = cfg.object_localization
         self.object_localization_weight: float = cfg.object_localization_weight
         self.localization_layers = cfg.localization_layers
-        self.mask_loss: bool = cfg.mask_loss
-        self.mask_loss_prob: float = cfg.mask_loss_prob
+        self.mask_loss = cfg.mask_loss
+        self.mask_loss_prob = cfg.mask_loss_prob
+        # add: 顔の一致防止損失
+        self.face_separation = cfg.face_separation
+        self.face_separation_weight = cfg.face_separation_weight
+        self.facenet = FaceNet()
 
         embed_dim = text_encoder.config.hidden_size
 
@@ -529,8 +535,29 @@ class FastComposerModel(nn.Module):
             target = target * mask
 
         denoise_loss = F.mse_loss(pred.float(), target.float(), reduction="mean")
-
+        
         return_dict = {"denoise_loss": denoise_loss}
+
+        # 追加: 顔の一致防止損失
+        if cfg.face_separation:
+            # 顔部分の再構成画像を取得
+            decoded_gen_image = self.vae.decode(pred / self.vae.config.scaling_factor).sample()
+            
+            print(f"type(decoded_gen_image): {type(decoded_gen_image)}")
+
+            # 生成画像の顔部分を取得
+            gen_faces = self.facenet.detect(decoded_gen_image)
+
+            print(f"type(decoded_gen_image): {type(decoded_gen_image)}")
+
+            face_separation_loss = torch.clamp(
+                (self.face_separation_delta - torch.norm(face_mask * (decoded_gen_image - decoded_ref_image), p=2, dim=(1, 2, 3))) ** 2, 
+                min=0.0
+            ).mean()
+
+            return_dict["face_separation_loss"] = face_separation_loss
+
+            denoise_loss += self.face_separation_weight * face_separation_loss  # 重みを調整
 
         if self.object_localization:
             object_segmaps = batch["object_segmaps"]
@@ -551,3 +578,14 @@ class FastComposerModel(nn.Module):
 
         return_dict["loss"] = loss
         return return_dict
+
+
+class FaceNet:
+    def __init__(self):
+        self.model = MTCNN(keep_all=True, margin=0)
+
+    def detect(self, image):
+        return self.model(image)
+
+    def _to_pixel(self, box):
+        return box[0], box[1], box[2], box[3]
