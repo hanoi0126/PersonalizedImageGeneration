@@ -4,10 +4,9 @@ import os
 import shutil
 import sys
 import time
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
-import wandb
 import diffusers
 import hydra
 import torch
@@ -23,6 +22,7 @@ from omegaconf import DictConfig, OmegaConf
 from tqdm.auto import tqdm
 from transformers import CLIPTokenizer
 
+import wandb
 from fastcomposer.data import FastComposerDataset, get_data_loader
 from fastcomposer.model import FastComposerModel
 from fastcomposer.transforms import (
@@ -33,7 +33,13 @@ from fastcomposer.transforms import (
 
 logger = get_logger(__name__)
 
-wandb.init(project="personalization-training", entity="hiroto-weblab", name=datetime.now().strftime("%Y-%m-%d-%H-%M-%S"), settings=wandb.Settings(mode="disabled"))
+wandb.init(
+    project="personalization-training",
+    entity="hiroto-weblab",
+    name=datetime.now().strftime("%Y-%m-%d-%H-%M-%S"),
+    settings=wandb.Settings(mode="disabled"),
+)
+
 
 @hydra.main(version_base=None, config_path="../configs", config_name="train_config")
 def train(cfg: DictConfig) -> None:
@@ -292,7 +298,7 @@ def train(cfg: DictConfig) -> None:
     # Potentially load in the weights and states from a previous save
     if cfg.resume_from_checkpoint:
         if cfg.resume_from_checkpoint != "latest":
-            path = os.path.basename(cfg.resume_from_checkpoint)
+            path = cfg.resume_from_checkpoint
         else:
             # Get the most recent checkpoint
             dirs = os.listdir(cfg.output_dir)
@@ -307,8 +313,8 @@ def train(cfg: DictConfig) -> None:
             cfg.resume_from_checkpoint = None
         else:
             accelerator.print(f"Resuming from checkpoint {path}")
-            accelerator.load_state(os.path.join(cfg.output_dir, path))
-            global_step = int(path.split("-")[1])
+            accelerator.load_state(path)
+            global_step = cfg.global_step
 
             first_epoch = global_step // num_update_steps_per_epoch
 

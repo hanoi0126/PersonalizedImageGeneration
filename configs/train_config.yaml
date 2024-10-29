@@ -19,7 +19,7 @@ object_types: person
 max_train_samples: 100
 
 # training
-train_batch_size: 4
+train_batch_size: 1
 num_train_epochs: 100 # 150000
 max_train_steps: 150000 # 150000
 gradient_accumulation_steps: 1
@@ -92,7 +92,8 @@ lr_warmup_steps: 500
 checkpointing_steps: 200
 keep_only_last_checkpoint: True
 keep_interval: 10000
-resume_from_checkpoint: latest
+resume_from_checkpoint: models/fastcomposer
+global_step: 0
 
 variance_type:
 dynamic_thresholding_ratio:

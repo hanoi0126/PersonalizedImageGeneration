@@ -4,8 +4,8 @@ import os
 import shutil
 import sys
 import time
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 import diffusers
 import hydra
@@ -33,8 +33,12 @@ from fastcomposer.transforms import (
 
 logger = get_logger(__name__)
 
-#set datatime
-wandb.init(project="personalization-training", entity="hiroto-weblab", name=datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
+# set datatime
+wandb.init(
+    project="personalization-training",
+    entity="hiroto-weblab",
+    name=datetime.now().strftime("%Y-%m-%d-%H-%M-%S"),
+)
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="train_config")

@@ -1,4 +1,5 @@
 import gc
+import os
 import types
 import warnings
 from typing import Optional, Tuple, Union
@@ -7,11 +8,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as T
+import torchvision.utils as vutils
 from diffusers import AutoencoderKL, StableDiffusionPipeline, UNet2DConditionModel
+from facenet_pytorch import MTCNN, extract_face
+from PIL import Image
 from transformers import CLIPTextModel
 from transformers.modeling_outputs import BaseModelOutputWithPooling
-
-from facenet_pytorch import MTCNN
 from transformers.models.clip.modeling_clip import (
     CLIPModel,
     CLIPPreTrainedModel,
@@ -408,6 +410,8 @@ class FastComposerModel(nn.Module):
         self.face_separation_weight = cfg.face_separation_weight
         self.facenet = FaceNet()
 
+        self.output_dir = cfg.output_dir
+
         embed_dim = text_encoder.config.hidden_size
 
         self.postfuse_module = FastComposerPostfuseModule(embed_dim)
@@ -475,6 +479,8 @@ class FastComposerModel(nn.Module):
         object_pixel_values = batch["object_pixel_values"]
         num_objects = batch["num_objects"]
 
+        save_batch_images(batch, f"{self.output_dir}/batch_images")
+
         vae_dtype = self.vae.parameters().__next__().dtype
         vae_input = pixel_values.to(vae_dtype)
 
@@ -534,30 +540,93 @@ class FastComposerModel(nn.Module):
             pred = pred * mask
             target = target * mask
 
+        # noise_scheduler のデバイスを取得
+        device = noise_scheduler.alphas_cumprod.device
+
+        # 各テンソルを noise_scheduler のデバイスに移動
+        noisy_latents = noisy_latents.to(device)
+        pred = pred.to(device)
+        timesteps = timesteps.to(device)
+
+        denoised_latents = noise_scheduler.step(
+            pred, timesteps, noisy_latents
+        ).prev_sample
+
+        vae_device = next(self.vae.parameters()).device
+        denoised_latents = denoised_latents.to(vae_dtype).to(vae_device)
+        with torch.no_grad():
+            decoded_gen_image = self.vae.decode(
+                denoised_latents / self.vae.config.scaling_factor
+            ).sample
+
+        # キャッシュをクリア
+        torch.cuda.empty_cache()
+
+        save_generated_images(decoded_gen_image, f"{self.output_dir}/generated_images")
+
+        print(f"pred.shape: {pred.shape}, device: {pred.device}")
+        print(f"target.shape: {target.shape}, device: {target.device}")
+
+        pred = pred.to(target.device)
         denoise_loss = F.mse_loss(pred.float(), target.float(), reduction="mean")
-        
+
         return_dict = {"denoise_loss": denoise_loss}
 
         # 追加: 顔の一致防止損失
-        if cfg.face_separation:
+        if self.face_separation:
             # 顔部分の再構成画像を取得
-            decoded_gen_image = self.vae.decode(pred / self.vae.config.scaling_factor).sample()
-            
-            print(f"type(decoded_gen_image): {type(decoded_gen_image)}")
+            for i, (ref_image_tensor, gen_image_tensor) in enumerate(
+                zip(pixel_values, decoded_gen_image)
+            ):
+                gen_image_pil = self.facenet.tensor_to_pil(gen_image_tensor)
+                ref_image_pil = self.facenet.tensor_to_pil(ref_image_tensor)
+                print(f"type(gen_image_pil): {type(gen_image_pil)}")
+                print(f"gen_image_pil.size: {gen_image_pil.size}")
 
-            # 生成画像の顔部分を取得
-            gen_faces = self.facenet.detect(decoded_gen_image)
+                ref_boxes, ref_probs = self.facenet.detect(ref_image_pil)
+                gen_boxes, gen_probs = self.facenet.detect(gen_image_pil)
 
-            print(f"type(decoded_gen_image): {type(decoded_gen_image)}")
+                # キャッシュをクリア
+                torch.cuda.empty_cache()
 
-            face_separation_loss = torch.clamp(
-                (self.face_separation_delta - torch.norm(face_mask * (decoded_gen_image - decoded_ref_image), p=2, dim=(1, 2, 3))) ** 2, 
-                min=0.0
-            ).mean()
+                if len(ref_boxes) == 0 or len(gen_boxes) == 0:
+                    continue
+
+                ref_faces = []
+                gen_faces = []
+                for j, box in enumerate(ref_boxes):
+                    tensor_face = extract_face(
+                        ref_image_pil,
+                        box,
+                        save_path=f"{self.output_dir}/face/detected_face_{i}_{j}_ref.png",
+                    )
+                    ref_faces.append(tensor_face)
+                for j, box in enumerate(gen_boxes):
+                    tensor_face = extract_face(
+                        gen_image_pil,
+                        box,
+                        save_path=f"{self.output_dir}/face/detected_face_{i}_{j}_gen.png",
+                    )
+                    gen_faces.append(tensor_face)
+
+            face_errors = []
+            for ref_face, gen_face in zip(ref_faces, gen_faces):
+                # デバイスを統一してテンソルに変換
+                ref_face = ref_face.to(gen_face.device).float()
+                gen_face = gen_face.float()
+
+                # ピクセルごとの MSE を計算
+                mse_loss = F.mse_loss(gen_face, ref_face, reduction="mean")
+                face_errors.append(mse_loss)
+
+            # 全ての顔領域の平均ピクセル誤差を取得
+            face_separation_loss = torch.stack(face_errors).mean()
 
             return_dict["face_separation_loss"] = face_separation_loss
 
-            denoise_loss += self.face_separation_weight * face_separation_loss  # 重みを調整
+            denoise_loss += (
+                self.face_separation_weight * face_separation_loss
+            )  # 重みを調整
 
         if self.object_localization:
             object_segmaps = batch["object_segmaps"]
@@ -577,15 +646,75 @@ class FastComposerModel(nn.Module):
             loss = denoise_loss
 
         return_dict["loss"] = loss
+        torch.cuda.empty_cache()
         return return_dict
 
 
 class FaceNet:
     def __init__(self):
         self.model = MTCNN(keep_all=True, margin=0)
+        self.to_pil = T.ToPILImage()
 
     def detect(self, image):
-        return self.model(image)
+        return self.model.detect(image)
 
-    def _to_pixel(self, box):
-        return box[0], box[1], box[2], box[3]
+    def tensor_to_pil(self, tensor_image):
+        return self.to_pil(tensor_image.cpu().float().clamp(0, 1))
+
+
+def save_batch_images(batch, save_directory):
+    """
+    バッチ内の各画像とオブジェクト画像を保存します。
+
+    Args:
+        batch (dict): `FastComposerDataset` から取得したバッチデータ。
+        save_directory (str): 画像を保存するディレクトリ。
+    """
+    os.makedirs(save_directory, exist_ok=True)
+
+    num_image = len(os.listdir(save_directory))
+
+    # バッチ内の画像数を取得
+    batch_size = batch["pixel_values"].size(0)
+
+    for i in range(batch_size):
+        # pixel_valuesの保存
+        pixel_values = batch["pixel_values"][i].cpu()
+        img = vutils.make_grid(pixel_values, normalize=True, scale_each=True)
+        img_pil = Image.fromarray(img.mul(255).permute(1, 2, 0).byte().numpy())
+        img_pil.save(os.path.join(save_directory, f"image_{i}.png"))
+
+        # 各オブジェクト画像の保存
+        num_objects = batch["num_objects"][i].item()
+        for j in range(num_objects):
+            object_pixel_values = batch["object_pixel_values"][i][j].cpu()
+            object_img = vutils.make_grid(
+                object_pixel_values, normalize=True, scale_each=True
+            )
+            object_img_pil = Image.fromarray(
+                object_img.mul(255).permute(1, 2, 0).byte().numpy()
+            )
+            object_img_pil.save(
+                os.path.join(save_directory, f"image_{num_image}_object_{j}.png")
+            )
+
+        print(f"Saved images for batch index {i}")
+
+
+def save_generated_images(tensor_images, save_directory, prefix="generated"):
+    """
+    生成された画像を保存する関数
+
+    Args:
+        tensor_images (torch.Tensor): 生成された画像テンソル (bsz, C, H, W)
+        save_directory (str): 画像を保存するディレクトリ
+        prefix (str): ファイル名のプレフィックス
+    """
+    os.makedirs(save_directory, exist_ok=True)
+    num_image = len(os.listdir(save_directory))
+
+    to_pil = T.ToPILImage()
+
+    for i, tensor_image in enumerate(tensor_images):
+        img_pil = to_pil(tensor_image.cpu().float().clamp(0, 1))
+        img_pil.save(os.path.join(save_directory, f"{prefix}_image_{num_image}.png"))
