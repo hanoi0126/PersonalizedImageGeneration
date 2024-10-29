@@ -472,14 +472,14 @@ class FastComposerModel(nn.Module):
 
         return pipe
 
-    def forward(self, batch, noise_scheduler):
+    def forward(self, batch, noise_scheduler, return_image=False):
         pixel_values = batch["pixel_values"]
         input_ids = batch["input_ids"]
         image_token_mask = batch["image_token_mask"]
         object_pixel_values = batch["object_pixel_values"]
         num_objects = batch["num_objects"]
 
-        save_batch_images(batch, f"{self.output_dir}/batch_images")
+        # save_batch_images(batch, f"{self.output_dir}/batch_images")
 
         vae_dtype = self.vae.parameters().__next__().dtype
         vae_input = pixel_values.to(vae_dtype)
@@ -540,93 +540,8 @@ class FastComposerModel(nn.Module):
             pred = pred * mask
             target = target * mask
 
-        # noise_scheduler のデバイスを取得
-        device = noise_scheduler.alphas_cumprod.device
-
-        # 各テンソルを noise_scheduler のデバイスに移動
-        noisy_latents = noisy_latents.to(device)
-        pred = pred.to(device)
-        timesteps = timesteps.to(device)
-
-        denoised_latents = noise_scheduler.step(
-            pred, timesteps, noisy_latents
-        ).prev_sample
-
-        vae_device = next(self.vae.parameters()).device
-        denoised_latents = denoised_latents.to(vae_dtype).to(vae_device)
-        with torch.no_grad():
-            decoded_gen_image = self.vae.decode(
-                denoised_latents / self.vae.config.scaling_factor
-            ).sample
-
-        # キャッシュをクリア
-        torch.cuda.empty_cache()
-
-        save_generated_images(decoded_gen_image, f"{self.output_dir}/generated_images")
-
-        print(f"pred.shape: {pred.shape}, device: {pred.device}")
-        print(f"target.shape: {target.shape}, device: {target.device}")
-
-        pred = pred.to(target.device)
         denoise_loss = F.mse_loss(pred.float(), target.float(), reduction="mean")
-
         return_dict = {"denoise_loss": denoise_loss}
-
-        # 追加: 顔の一致防止損失
-        if self.face_separation:
-            # 顔部分の再構成画像を取得
-            for i, (ref_image_tensor, gen_image_tensor) in enumerate(
-                zip(pixel_values, decoded_gen_image)
-            ):
-                gen_image_pil = self.facenet.tensor_to_pil(gen_image_tensor)
-                ref_image_pil = self.facenet.tensor_to_pil(ref_image_tensor)
-                print(f"type(gen_image_pil): {type(gen_image_pil)}")
-                print(f"gen_image_pil.size: {gen_image_pil.size}")
-
-                ref_boxes, ref_probs = self.facenet.detect(ref_image_pil)
-                gen_boxes, gen_probs = self.facenet.detect(gen_image_pil)
-
-                # キャッシュをクリア
-                torch.cuda.empty_cache()
-
-                if len(ref_boxes) == 0 or len(gen_boxes) == 0:
-                    continue
-
-                ref_faces = []
-                gen_faces = []
-                for j, box in enumerate(ref_boxes):
-                    tensor_face = extract_face(
-                        ref_image_pil,
-                        box,
-                        save_path=f"{self.output_dir}/face/detected_face_{i}_{j}_ref.png",
-                    )
-                    ref_faces.append(tensor_face)
-                for j, box in enumerate(gen_boxes):
-                    tensor_face = extract_face(
-                        gen_image_pil,
-                        box,
-                        save_path=f"{self.output_dir}/face/detected_face_{i}_{j}_gen.png",
-                    )
-                    gen_faces.append(tensor_face)
-
-            face_errors = []
-            for ref_face, gen_face in zip(ref_faces, gen_faces):
-                # デバイスを統一してテンソルに変換
-                ref_face = ref_face.to(gen_face.device).float()
-                gen_face = gen_face.float()
-
-                # ピクセルごとの MSE を計算
-                mse_loss = F.mse_loss(gen_face, ref_face, reduction="mean")
-                face_errors.append(mse_loss)
-
-            # 全ての顔領域の平均ピクセル誤差を取得
-            face_separation_loss = torch.stack(face_errors).mean()
-
-            return_dict["face_separation_loss"] = face_separation_loss
-
-            denoise_loss += (
-                self.face_separation_weight * face_separation_loss
-            )  # 重みを調整
 
         if self.object_localization:
             object_segmaps = batch["object_segmaps"]
@@ -645,9 +560,94 @@ class FastComposerModel(nn.Module):
         else:
             loss = denoise_loss
 
+        decoded_gen_image = self.generate_images(
+            latents, timesteps, encoder_hidden_states, noise_scheduler, 25
+        )
+        # save_generated_images(decoded_gen_image, f"{self.output_dir}/generated_images")
+        if return_image:
+            to_pil = T.ToPILImage()
+            ref_img_pil = to_pil(pixel_values[0].cpu().float().clamp(0, 1))
+            gen_img_pil = to_pil(decoded_gen_image[0].cpu().float().clamp(0, 1))
+            return_dict["decoded_ref_image"] = ref_img_pil
+            return_dict["decoded_gen_image"] = gen_img_pil
+
+        pred = pred.to(target.device)
+
+        # 追加: 顔の一致防止損失
+        if self.face_separation:
+            face_errors = []
+            for i, (ref_image_tensor, gen_image_tensor) in enumerate(
+                zip(pixel_values, decoded_gen_image)
+            ):
+                gen_image_pil = self.facenet.tensor_to_pil(gen_image_tensor)
+                ref_image_pil = self.facenet.tensor_to_pil(ref_image_tensor)
+
+                ref_boxes, ref_probs = self.facenet.detect(ref_image_pil)
+                gen_boxes, gen_probs = self.facenet.detect(gen_image_pil)
+
+                if ref_boxes is None or gen_boxes is None:
+                    face_errors.append(torch.tensor(0.0))
+                    continue
+
+                ref_faces = []
+                gen_faces = []
+                for j, box in enumerate(ref_boxes):
+                    tensor_face = extract_face(
+                        ref_image_pil,
+                        box,
+                        # save_path=f"{self.output_dir}/face/detected_face_{i}_{j}_ref.png",
+                    )
+                    ref_faces.append(tensor_face)
+                for j, box in enumerate(gen_boxes):
+                    tensor_face = extract_face(
+                        gen_image_pil,
+                        box,
+                        # save_path=f"{self.output_dir}/face/detected_face_{i}_{j}_gen.png",
+                    )
+                    gen_faces.append(tensor_face)
+
+                for ref_face, gen_face in zip(ref_faces, gen_faces):
+                    # デバイスを統一してテンソルに変換
+                    ref_face = ref_face.to(gen_face.device).float()
+                    gen_face = gen_face.float()
+
+                    # ピクセルごとの MSE を計算
+                    mse_loss = F.mse_loss(gen_face, ref_face, reduction="mean")
+                    face_errors.append(mse_loss)
+
+            # 全ての顔領域の平均ピクセル誤差を取得
+            print(f"face_errors: {face_errors}, timesteps: {timesteps}")
+            face_separation_loss = torch.stack(face_errors).mean()
+
+            return_dict["face_separation_loss"] = (
+                self.face_separation_weight * face_separation_loss
+            )
+
+            loss += self.face_separation_weight * face_separation_loss  # 重みを調整
+
         return_dict["loss"] = loss
+        print(
+            f"loss: {loss}, denoise_loss: {denoise_loss}, localization_loss: {localization_loss}, face_separation_loss: {face_separation_loss}"
+        )
         torch.cuda.empty_cache()
         return return_dict
+
+    @torch.no_grad()
+    def generate_images(
+        self, latents, timesteps, encoder_hidden_states, scheduler, num_inference_steps
+    ):
+        for i, t in enumerate(timesteps):
+            latent_model_input = scheduler.scale_model_input(latents, t)
+
+            # predict the noise residual
+            noise_pred = self.unet(latent_model_input, t, encoder_hidden_states).sample
+
+            # compute the previous noisy sample x_t -> x_t-1
+            latents = scheduler.step(noise_pred, t, latents).prev_sample
+
+        image = self.vae.decode(latents / self.vae.config.scaling_factor).sample
+
+        return image
 
 
 class FaceNet:
@@ -682,7 +682,7 @@ def save_batch_images(batch, save_directory):
         pixel_values = batch["pixel_values"][i].cpu()
         img = vutils.make_grid(pixel_values, normalize=True, scale_each=True)
         img_pil = Image.fromarray(img.mul(255).permute(1, 2, 0).byte().numpy())
-        img_pil.save(os.path.join(save_directory, f"image_{i}.png"))
+        img_pil.save(os.path.join(save_directory, f"image_{num_image}_{i}.png"))
 
         # 各オブジェクト画像の保存
         num_objects = batch["num_objects"][i].item()
@@ -698,7 +698,7 @@ def save_batch_images(batch, save_directory):
                 os.path.join(save_directory, f"image_{num_image}_object_{j}.png")
             )
 
-        print(f"Saved images for batch index {i}")
+        # print(f"Saved images for batch index {i}")
 
 
 def save_generated_images(tensor_images, save_directory, prefix="generated"):

@@ -5,7 +5,9 @@ logging_dir: outputs/${now_dir}/logs
 
 # custom
 face_separation: True
-face_separation_weight: 1
+face_separation_weight: 1e-3
+face_separation_delta: 0.5
+
 
 # others
 seed: 42

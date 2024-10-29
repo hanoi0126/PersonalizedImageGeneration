@@ -37,7 +37,7 @@ wandb.init(
     project="personalization-training",
     entity="hiroto-weblab",
     name=datetime.now().strftime("%Y-%m-%d-%H-%M-%S"),
-    settings=wandb.Settings(mode="disabled"),
+    # settings=wandb.Settings(mode="disabled"),
 )
 
 
@@ -334,13 +334,17 @@ def train(cfg: DictConfig) -> None:
         train_loss = 0.0
         denoise_loss = 0.0
         localization_loss = 0.0
+        face_separation_loss = 0.0
         for step, batch in enumerate(train_dataloader):
             progress_bar.set_description("Global step: {}".format(global_step))
 
             with accelerator.accumulate(model), torch.backends.cuda.sdp_kernel(
                 enable_flash=not cfg.disable_flashattention
             ):
-                return_dict = model(batch, noise_scheduler)
+                if step % 100 == 0:
+                    return_dict = model(batch, noise_scheduler, return_image=True)
+                else:
+                    return_dict = model(batch, noise_scheduler)
                 loss = return_dict["loss"]
 
                 # Gather the losses across all processes for logging (if we use distributed training).
@@ -362,6 +366,22 @@ def train(cfg: DictConfig) -> None:
                         avg_localization_loss.item() / cfg.gradient_accumulation_steps
                     )
 
+                if "face_separation_loss" in return_dict:
+                    avg_face_separation_loss = accelerator.gather(
+                        return_dict["face_separation_loss"].repeat(cfg.train_batch_size)
+                    ).mean()
+                    # 各値を float に変換してから計算
+                    avg_face_separation_loss_value = float(
+                        avg_face_separation_loss.item()
+                    ) / float(cfg.gradient_accumulation_steps)
+                    adjusted_loss = (
+                        float(cfg.face_separation_delta)
+                        - avg_face_separation_loss_value
+                    )
+                    # 条件分岐で adjusted_loss を加算
+                    if adjusted_loss > 0.0:
+                        face_separation_loss += adjusted_loss
+
                 # Backpropagate
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
@@ -382,12 +402,33 @@ def train(cfg: DictConfig) -> None:
                         "train_loss": train_loss,
                         "denoise_loss": denoise_loss,
                         "localization_loss": localization_loss,
+                        "face_separation_loss": face_separation_loss,
                     },
                     step=global_step,
                 )
+
+                # log generate image
+                if step % 100 == 0:
+                    accelerator.log(
+                        {
+                            "generated_images": [
+                                wandb.Image(
+                                    return_dict["decoded_ref_image"],
+                                    caption=f"ref-step-{global_step:08}-batch-{step:08}",
+                                ),
+                                wandb.Image(
+                                    return_dict["decoded_gen_image"],
+                                    caption=f"gen-step-{global_step:08}-batch-{step:08}",
+                                ),
+                            ]
+                        },
+                        step=global_step,
+                    )
+
                 train_loss = 0.0
                 denoise_loss = 0.0
                 localization_loss = 0.0
+                face_separation_loss = 0.0
 
                 if (
                     global_step % cfg.checkpointing_steps == 0
