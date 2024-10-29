@@ -21,7 +21,7 @@ object_types: person
 max_train_samples: 100
 
 # training
-train_batch_size: 1
+train_batch_size: 4
 num_train_epochs: 100 # 150000
 max_train_steps: 150000 # 150000
 gradient_accumulation_steps: 1
