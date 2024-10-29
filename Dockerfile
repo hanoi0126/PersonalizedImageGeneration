@@ -18,6 +18,7 @@ RUN ln -sf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime && \
     libbz2-dev \
     python3-pip \
     python3-setuptools \
+    openssh-client \
     wget \
     git \
     tzdata \
