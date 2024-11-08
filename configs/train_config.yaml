@@ -7,6 +7,7 @@ logging_dir: outputs/${now_dir}/logs
 face_separation: True
 face_separation_weight: 1e-3
 face_separation_delta: 0.5
+pass_face_separation_loss: False
 
 
 # others

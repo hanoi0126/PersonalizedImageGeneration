@@ -36,7 +36,7 @@ logger = get_logger(__name__)
 wandb.init(
     project="personalization-training",
     entity="hiroto-weblab",
-    name=datetime.now().strftime("%Y-%m-%d-%H-%M-%S"),
+    name=datetime.now().strftime("%Y-%m-%d/%H-%M-%S"),
     # settings=wandb.Settings(mode="disabled"),
 )
 
@@ -381,6 +381,15 @@ def train(cfg: DictConfig) -> None:
                     # 条件分岐で adjusted_loss を加算
                     if adjusted_loss > 0.0:
                         face_separation_loss += adjusted_loss
+                        logging.info(
+                            f"face_separation_loss: {face_separation_loss}, adjusted_loss: {adjusted_loss}, in image: {batch['image_id']}"
+                        )
+
+                # Adjust total loss depending on cfg.pass_face_separation_loss
+                if cfg.pass_face_separation_loss:
+                    total_loss = loss + face_separation_loss.detach()
+                else:
+                    total_loss = loss + face_separation_loss
 
                 # Backpropagate
                 accelerator.backward(loss)
