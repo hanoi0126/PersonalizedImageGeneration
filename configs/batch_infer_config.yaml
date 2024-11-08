@@ -4,7 +4,7 @@ mixed_precision: fp16  # choices: ["no", "fp16", "bf16"]
 output_dir: outputs/${now_dir}
 seed: 42
 pretrained_model_path: models/basemodel
-finetuned_model_path: outputs/2024-10-25/14-06-41/checkpoint-150000
+finetuned_model_path: outputs/2024-10-29/19-10-11/checkpoint-3200
 enable_xformers_memory_efficient_attention: false
 
 # Inference
@@ -81,3 +81,8 @@ caption_list:
   - a man <|image|> is working out at the gym
   - a man <|image|> is walking the dog
   - a man <|image|> is baking cookies
+
+# Custom
+face_separation: False
+face_separation_weight: 
+face_separation_delta: 

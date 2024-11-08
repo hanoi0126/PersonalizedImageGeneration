@@ -4,11 +4,11 @@ mixed_precision: fp16  # choices: ["no", "fp16", "bf16"]
 output_dir: outputs/${now_dir}
 seed: 42
 pretrained_model_path: models/basemodel
-finetuned_model_path: outputs/2024-10-25/14-06-41/checkpoint-150000
+finetuned_model_path: outputs/2024-10-29/19-10-11/checkpoint-3200
 enable_xformers_memory_efficient_attention: false
 
 # Inference
-caption: A proud sailor <|image|>, standing at the bow of a ship, hands gripping the railing, his captain's hat firmly on his head, looking out to sea, the salty breeze blowing through his hair, waves crashing against the hull, crying through clenched teeth.
+caption: a man <|image|> reading book
 reference_dir: data/celeba/000023
 max_num_objects: 10
 num_images_per_prompt: 1
@@ -32,3 +32,8 @@ image_encoder_name_or_path: openai/clip-vit-large-patch14
 no_object_augmentation: true
 object_resolution: 224
 image_encoder_type: clip
+
+# Custom
+face_separation: False
+face_separation_weight: 
+face_separation_delta: 

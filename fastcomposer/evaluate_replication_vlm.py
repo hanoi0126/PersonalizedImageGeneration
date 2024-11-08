@@ -21,11 +21,11 @@ client = OpenAI()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 SYSTEM_PROMPT = (
-    "Evaluate the generated images based on how well they maintain the identity of the person in the input image without showing obvious copy-paste artifacts. "
-    "For each image, assign one of the following categories and provide a reason for your choice:"
-    "Natural variation: The person depicted in the image appears to be the same individual as in the input image, but natural variations in expression, pose, or context (e.g., smile, head tilt) make it look different in a realistic manner."
-    "Replication (copy-paste effect): The person’s face appears to be the same as in the input image, but the image shows clear signs of copying (e.g., expression is exactly the same as in the reference image, with no change)."
-    "Please provide your reasoning for each category using the following JSON format:"
+    "Evaluate the generated images based on how well they maintain the identity of the person in the input image without showing obvious copy-paste artifacts.\n"
+    "Assign one of the following categories and provide a reason for your choice:\n"
+    "Natural variation: The person depicted in the image appears to be the same individual as in the input image, but natural variations in expression, pose, or context (e.g., smile, head tilt) make it look different in a realistic manner.\n"
+    "Replication (copy-paste effect): The person’s face appears to be the same as in the input image, but the image shows clear signs of copying (e.g., expression is exactly the same as in the reference image, with no change).\n"
+    "Please provide your reasoning for each category using the following JSON format:\n"
     """
     {
         "category": [1, or 2],
@@ -81,7 +81,7 @@ def inference(model_name: str, example_image: Image, images: list[Image]) -> Non
         content = [
             SYSTEM_PROMPT,
             example_image,
-            "Here is an example image. Prease refer to this image when answering the question.",
+            "Here is an example image. Prease refer to this image when answering the question.\nNo response to the example is necessary.",
         ] + images
         response = model.generate_content(content)
         result = response.text
