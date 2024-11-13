@@ -6,7 +6,18 @@ output_dir: outputs/${now_dir}
 # input
 reference_image: data/celeba/000023/000023_hb_x4_resize.png
 generated_image: outputs/2024-09-13/23-50-24/output_0.png
-generated_image_dir: data/uniportrait
+generated_image_dir: outputs/2024-11-12/13-20-15
+
+# validate metrics
+# not replicate
+# data/celeba/00001
+# replicate
+# data/celeba_inpaint
+
+# generated results
+# bm: outputs/2024-10-08/15-12-14
+# v1: outputs/2024-10-30/12-53-42
+# v2: outputs/2024-11-12/13-20-15
 
 # for vlm 
 few_shot_example: data/example/merged_image.png

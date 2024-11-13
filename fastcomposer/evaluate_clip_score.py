@@ -3,10 +3,11 @@ import os
 import hydra
 import pandas as pd
 import torch
-from facenet_pytorch import MTCNN, InceptionResnetV1
+import torch.nn.functional as F
+from facenet_pytorch import MTCNN, InceptionResnetV1, extract_face
 from omegaconf import DictConfig
 from PIL import Image
-from transformers import CLIPProcessor, CLIPModel
+from transformers import CLIPModel, CLIPProcessor
 
 
 class Evaluator:
@@ -20,6 +21,8 @@ class Evaluator:
         self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(self.device)
         self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
 
+        self.ref_image = Image.open(ref_image_path)
+        self.ref_boxes, _ = self.mtcnn.detect(Image.open(ref_image_path))
         self.ref_face = self.get_subject_from_image(Image.open(ref_image_path))
 
     def encode_text(self, text):
@@ -70,12 +73,44 @@ class Evaluator:
         ref_embedding = self.resnet(self.ref_face[0].to(self.device).unsqueeze(0))
         gen_embeddings = [self.resnet(gen_subject.unsqueeze(0).to(self.device)) for gen_subject in gen_subjects]
 
-        similarities = [
-            self.cosine_similarity(gen_embedding, ref_embedding)
-            for gen_embedding in gen_embeddings
-        ]
+        similarities = [self.cosine_similarity(gen_embedding, ref_embedding) for gen_embedding in gen_embeddings]
 
         return max(similarities)
+
+    def calc_face_separation(self, gen_image):
+        face_errors = []
+        gen_boxes, gen_probs = self.mtcnn.detect(gen_image)
+
+        if self.ref_boxes is None or gen_boxes is None:
+            face_errors.append(torch.tensor(0.0))
+
+        ref_faces = []
+        gen_faces = []
+        for j, box in enumerate(self.ref_boxes):
+            tensor_face = extract_face(
+                self.ref_image,
+                box,
+                # save_path=f"{self.output_dir}/face/detected_face_{i}_{j}_ref.png",
+            )
+            ref_faces.append(tensor_face)
+        for j, box in enumerate(gen_boxes):
+            tensor_face = extract_face(
+                gen_image,
+                box,
+                # save_path=f"{self.output_dir}/face/detected_face_{i}_{j}_gen.png",
+            )
+            gen_faces.append(tensor_face)
+
+        for ref_face, gen_face in zip(ref_faces, gen_faces):
+            # デバイスを統一してテンソルに変換
+            ref_face = ref_face.to(gen_face.device).float()
+            gen_face = gen_face.float()
+
+            # ピクセルごとの MSE を計算
+            mse_loss = F.mse_loss(gen_face, ref_face, reduction="mean")
+            face_errors.append(mse_loss)
+
+        return torch.stack(face_errors).mean()
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="eval_config")
@@ -95,9 +130,7 @@ def generate_response_with_images(cfg: DictConfig) -> None:
 
     evaluator = Evaluator(cfg.reference_image)
 
-    for idx, (generated_image_path, caption) in enumerate(
-        zip(generated_image_paths, caption_list)
-    ):
+    for idx, (generated_image_path, caption) in enumerate(zip(generated_image_paths, caption_list)):
         caption = caption.replace("<|image|>", "")
         print(f"Processing {generated_image_path}: {caption}...")
 
@@ -105,20 +138,24 @@ def generate_response_with_images(cfg: DictConfig) -> None:
 
         sim_txt2img = evaluator.calc_sim_txt2img(caption, gen_image)
         sim_img2img = evaluator.calc_sim_img2img(gen_image)
+        face_separation = evaluator.calc_face_separation(gen_image)
 
         print(f"txt2img >> {sim_txt2img}")
         print(f"img2img >> {sim_img2img}")
+        print(f"face separation >> {face_separation}")
 
         output_dict[idx]["image_path"] = generated_image_path
         output_dict[idx]["caption"] = caption
         output_dict[idx]["sim_txt2img"] = sim_txt2img
         output_dict[idx]["sim_img2img"] = sim_img2img
+        output_dict[idx]["face_separation"] = face_separation.item()
 
     df = pd.DataFrame(output_dict)
     df.to_csv(cfg.save_csv_path, index=False)
 
-    print(f"mean score txt2img >> {df['sim_txt2img'].mean()}({df['sim_txt2img'].std()})")
-    print(f"mean score img2img >> {df['sim_img2img'].mean()}({df['sim_img2img'].std()})")
+    print(f"mean score txt2img >> {df['sim_txt2img'].mean():.3f}({df['sim_txt2img'].std():.3f})")
+    print(f"mean score img2img >> {df['sim_img2img'].mean():.3f}({df['sim_img2img'].std():.3f})")
+    print(f"mean score face separation >> {df['face_separation'].mean():.3f}({df['face_separation'].std():.3f})")
 
 
 if __name__ == "__main__":
