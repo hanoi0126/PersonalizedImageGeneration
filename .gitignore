@@ -4,6 +4,7 @@ outputs/
 data/ffhq_wild_files
 data/ffhq_fastcomposer.tgz
 wandb/
+*.out
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

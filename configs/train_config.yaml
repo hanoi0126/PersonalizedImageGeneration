@@ -3,13 +3,23 @@ now_dir: ${now:%Y-%m-%d}/${now:%H-%M-%S}
 output_dir: outputs/${now_dir}
 logging_dir: outputs/${now_dir}/logs
 
-# custom
+# training options
 face_separation: True
 face_separation_weight: 1e-3
 face_separation_delta: 0.5
-pass_face_separation_loss: True
-face_expression: False
-face_part_rate: 0.1
+
+expression_sepeartion: True
+expression_separation_weight: 1e-3
+expression_separation_delta: 0.5
+
+landmark_separation: True
+landmark_separation_weight: 1e-3
+landmark_separation_delta: 0.5
+
+identity_separation: True
+identity_separation_weight: 1e-3
+identity_separation_delta: 0.5
+
 
 
 # others
