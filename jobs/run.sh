@@ -40,7 +40,7 @@ CUDA_VISIBLE_DEVICES=0 accelerate launch \
     --num_machines 1 \
     --main_process_port 11135 \
     --num_processes 1 \
-    fastcomposer/train_with_face_loss.py >> ${LOG_DIR}/job_output.log 2>&1
+    fastcomposer/train.py >> ${LOG_DIR}/job_output.log 2>&1
 
 # record job information
 cat <<EOF >> ${LOG_DIR}/job_output.log

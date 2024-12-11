@@ -1,16 +1,16 @@
 import gc
-import os
+import time
 import types
 import warnings
 from typing import Optional, Tuple, Union
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as T
-import torchvision.utils as vutils
 from diffusers import AutoencoderKL, StableDiffusionPipeline, UNet2DConditionModel
-from facenet_pytorch import MTCNN, extract_face
+from facenet_pytorch import MTCNN, InceptionResnetV1, extract_face
 from icecream import ic
 from PIL import Image
 from transformers import CLIPTextModel
@@ -86,7 +86,9 @@ class FastComposerCLIPImageEncoder(CLIPPreTrainedModel):
 
         if h != self.image_size or w != self.image_size:
             h, w = self.image_size, self.image_size
-            object_pixel_values = F.interpolate(object_pixel_values, (h, w), mode="bilinear", antialias=True)
+            object_pixel_values = F.interpolate(
+                object_pixel_values, (h, w), mode="bilinear", antialias=True
+            )
 
         object_pixel_values = self.vision_processor(object_pixel_values)
         object_embeds = self.vision_model(object_pixel_values)[1]
@@ -106,9 +108,14 @@ def fuse_object_embeddings(
 
     batch_size, max_num_objects = object_embeds.shape[:2]
     seq_length = inputs_embeds.shape[1]
-    flat_object_embeds = object_embeds.view(-1, object_embeds.shape[-2], object_embeds.shape[-1])
+    flat_object_embeds = object_embeds.view(
+        -1, object_embeds.shape[-2], object_embeds.shape[-1]
+    )
 
-    valid_object_mask = torch.arange(max_num_objects, device=flat_object_embeds.device)[None, :] < num_objects[:, None]
+    valid_object_mask = (
+        torch.arange(max_num_objects, device=flat_object_embeds.device)[None, :]
+        < num_objects[:, None]
+    )
 
     valid_object_embeds = flat_object_embeds[valid_object_mask.flatten()]
 
@@ -180,11 +187,19 @@ class FastComposerTextEncoder(CLIPPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple, BaseModelOutputWithPooling]:
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
         )
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        output_hidden_states = (
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
+        )
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         input_shape = input_ids.size()
         input_ids = input_ids.view(-1, input_shape[-1])
@@ -192,9 +207,9 @@ class FastComposerTextEncoder(CLIPPreTrainedModel):
         hidden_states = self.embeddings(input_ids)
 
         bsz, seq_len = input_shape
-        causal_attention_mask = self._build_causal_attention_mask(bsz, seq_len, hidden_states.dtype).to(
-            hidden_states.device
-        )
+        causal_attention_mask = self._build_causal_attention_mask(
+            bsz, seq_len, hidden_states.dtype
+        ).to(hidden_states.device)
 
         # expand attention_mask
         if attention_mask is not None:
@@ -218,7 +233,9 @@ class FastComposerTextEncoder(CLIPPreTrainedModel):
         # casting to torch.int for onnx compatibility: argmax doesn't support int64 inputs with opset 14
         pooled_output = last_hidden_state[
             torch.arange(last_hidden_state.shape[0], device=last_hidden_state.device),
-            input_ids.to(dtype=torch.int, device=last_hidden_state.device).argmax(dim=-1),
+            input_ids.to(dtype=torch.int, device=last_hidden_state.device).argmax(
+                dim=-1
+            ),
         ]
 
         if not return_dict:
@@ -255,7 +272,9 @@ def unet_store_cross_attention_scores(unet, attention_scores, layers=5):
 
     def make_new_get_attention_scores_fn(name):
         def new_get_attention_scores(module, query, key, attention_mask=None):
-            attention_probs = module.old_get_attention_scores(query, key, attention_mask)
+            attention_probs = module.old_get_attention_scores(
+                query, key, attention_mask
+            )
             attention_scores[name] = attention_probs
             return attention_probs
 
@@ -268,7 +287,9 @@ def unet_store_cross_attention_scores(unet, attention_scores, layers=5):
             if isinstance(module.processor, AttnProcessor2_0):
                 module.set_processor(AttnProcessor())
             module.old_get_attention_scores = module.get_attention_scores
-            module.get_attention_scores = types.MethodType(make_new_get_attention_scores_fn(name), module)
+            module.get_attention_scores = types.MethodType(
+                make_new_get_attention_scores_fn(name), module
+            )
 
     return unet
 
@@ -288,9 +309,13 @@ class BalancedL1Loss(nn.Module):
         background_segmaps_sum = background_segmaps.sum(dim=2) + 1e-5
         object_segmaps_sum = object_segmaps.sum(dim=2) + 1e-5
 
-        background_loss = (object_token_attn_prob * background_segmaps).sum(dim=2) / background_segmaps_sum
+        background_loss = (object_token_attn_prob * background_segmaps).sum(
+            dim=2
+        ) / background_segmaps_sum
 
-        object_loss = (object_token_attn_prob * object_segmaps).sum(dim=2) / object_segmaps_sum
+        object_loss = (object_token_attn_prob * object_segmaps).sum(
+            dim=2
+        ) / object_segmaps_sum
 
         return background_loss - object_loss
 
@@ -311,21 +336,29 @@ def get_object_localization_loss_for_one_layer(
         object_segmaps, size=(size, size), mode="bilinear", antialias=True
     )  # (b, max_num_objects, size, size)
 
-    object_segmaps = object_segmaps.view(b, max_num_objects, -1)  # (b, max_num_objects, num_noise_latents)
+    object_segmaps = object_segmaps.view(
+        b, max_num_objects, -1
+    )  # (b, max_num_objects, num_noise_latents)
 
     num_heads = bxh // b
 
-    cross_attention_scores = cross_attention_scores.view(b, num_heads, num_noise_latents, num_text_tokens)
+    cross_attention_scores = cross_attention_scores.view(
+        b, num_heads, num_noise_latents, num_text_tokens
+    )
 
     # Gather object_token_attn_prob
     object_token_attn_prob = torch.gather(
         cross_attention_scores,
         dim=3,
-        index=object_token_idx.view(b, 1, 1, max_num_objects).expand(b, num_heads, num_noise_latents, max_num_objects),
+        index=object_token_idx.view(b, 1, 1, max_num_objects).expand(
+            b, num_heads, num_noise_latents, max_num_objects
+        ),
     )  # (b, num_heads, num_noise_latents, max_num_objects)
 
     object_segmaps = (
-        object_segmaps.permute(0, 2, 1).unsqueeze(1).expand(b, num_heads, num_noise_latents, max_num_objects)
+        object_segmaps.permute(0, 2, 1)
+        .unsqueeze(1)
+        .expand(b, num_heads, num_noise_latents, max_num_objects)
     )
 
     loss = loss_fn(object_token_attn_prob, object_segmaps)
@@ -355,7 +388,9 @@ def get_object_localization_loss(
 
 
 class FastComposerModel(nn.Module):
-    def __init__(self, text_encoder: FastComposerTextEncoder, image_encoder, vae, unet, cfg):
+    def __init__(
+        self, text_encoder: FastComposerTextEncoder, image_encoder, vae, unet, cfg
+    ):
         super().__init__()
         self.text_encoder = text_encoder
         self.image_encoder = image_encoder
@@ -405,7 +440,9 @@ class FastComposerModel(nn.Module):
             subfolder="text_encoder",
             revision=cfg.revision,
         )
-        vae = AutoencoderKL.from_pretrained(cfg.pretrained_model_path, subfolder="vae", revision=cfg.revision)
+        vae = AutoencoderKL.from_pretrained(
+            cfg.pretrained_model_path, subfolder="vae", revision=cfg.revision
+        )
         unet = UNet2DConditionModel.from_pretrained(
             cfg.pretrained_model_path,
             subfolder="unet",
@@ -451,7 +488,9 @@ class FastComposerModel(nn.Module):
         noise = torch.randn_like(latents)
         bsz = latents.shape[0]
         # Sample a random timestep for each image
-        timesteps = torch.randint(0, noise_scheduler.num_train_timesteps, (bsz,), device=latents.device)
+        timesteps = torch.randint(
+            0, noise_scheduler.num_train_timesteps, (bsz,), device=latents.device
+        )
         timesteps = timesteps.long()
 
         # Add noise to the latents according to the noise magnitude at each timestep
@@ -461,7 +500,9 @@ class FastComposerModel(nn.Module):
         # (bsz, max_num_objects, num_image_tokens, dim)
         object_embeds = self.image_encoder(object_pixel_values)
 
-        encoder_hidden_states = self.text_encoder(input_ids, image_token_mask, object_embeds, num_objects)[
+        encoder_hidden_states = self.text_encoder(
+            input_ids, image_token_mask, object_embeds, num_objects
+        )[
             0
         ]  # (bsz, seq_len, dim)
 
@@ -478,7 +519,9 @@ class FastComposerModel(nn.Module):
         elif noise_scheduler.config.prediction_type == "v_prediction":
             target = noise_scheduler.get_velocity(latents, noise, timesteps)
         else:
-            raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
+            raise ValueError(
+                f"Unknown prediction type {noise_scheduler.config.prediction_type}"
+            )
 
         pred = self.unet(noisy_latents, timesteps, encoder_hidden_states).sample
 
@@ -514,7 +557,9 @@ class FastComposerModel(nn.Module):
         else:
             loss = denoise_loss
 
-        decoded_gen_image = self.generate_images(latents, timesteps, encoder_hidden_states, noise_scheduler, 25)
+        decoded_gen_image = self.generate_images(
+            latents, timesteps, encoder_hidden_states, noise_scheduler, 25
+        )
 
         if return_image:
             to_pil = T.ToPILImage()
@@ -527,7 +572,9 @@ class FastComposerModel(nn.Module):
 
         if self.cfg.face_separation:  # face separation loss
             face_errors = []
-            for i, (ref_image_tensor, gen_image_tensor) in enumerate(zip(pixel_values, decoded_gen_image)):
+            for i, (ref_image_tensor, gen_image_tensor) in enumerate(
+                zip(pixel_values, decoded_gen_image)
+            ):
                 ref_image_pil = self.adapter.tensor_to_pil(ref_image_tensor)
                 gen_image_pil = self.adapter.tensor_to_pil(gen_image_tensor)
 
@@ -554,22 +601,32 @@ class FastComposerModel(nn.Module):
                     mse_loss = F.mse_loss(gen_face, ref_face, reduction="mean")
                     face_errors.append(mse_loss)
 
-            face_separation_loss = torch.stack(face_errors).mean() * self.cfg.face_separation_weight
+            face_separation_loss = (
+                torch.stack(face_errors).mean() * self.cfg.face_separation_weight
+            )
             return_dict["face_separation_loss"] = face_separation_loss
             loss += face_separation_loss
-            print(f"face_separation_loss: {torch.stack(face_errors).mean()} >> scaled: {face_separation_loss}")
+            print(
+                f"face_separation_loss: {torch.stack(face_errors).mean()} >> scaled: {face_separation_loss}"
+            )
 
         if self.cfg.expression_separation:  # expression separation loss
-            continue
-        
+            print("expression_separation_loss: 0.0")
+
         if self.cfg.landmark_separation:  # landmark separation loss
             landmark_errors = []
-            for i, (ref_image_tensor, gen_image_tensor) in enumerate(zip(pixel_values, decoded_gen_image)):
+            for i, (ref_image_tensor, gen_image_tensor) in enumerate(
+                zip(pixel_values, decoded_gen_image)
+            ):
                 ref_image_pil = self.adapter.tensor_to_pil(ref_image_tensor)
                 gen_image_pil = self.adapter.tensor_to_pil(gen_image_tensor)
 
-                ref_boxes, _, ref_points = self.adapter.detect(ref_image_pil, landmarks=True)
-                gen_boxes, _, gen_points = self.adapter.detect(gen_image_pil, landmarks=True)
+                ref_boxes, _, ref_points = self.adapter.detect(
+                    ref_image_pil, landmarks=True
+                )
+                gen_boxes, _, gen_points = self.adapter.detect(
+                    gen_image_pil, landmarks=True
+                )
 
                 if ref_boxes is None or gen_boxes is None:
                     landmark_errors.append(torch.tensor(0.0))
@@ -583,33 +640,47 @@ class FastComposerModel(nn.Module):
                     mse_loss = F.mse_loss(gen_point, ref_point, reduction="mean")
                     landmark_errors.append(mse_loss)
 
-            landmark_separation_loss = torch.stack(landmark_errors).mean() * self.cfg.landmark_separation_weight
+            landmark_separation_loss = (
+                torch.stack(landmark_errors).mean()
+                * self.cfg.landmark_separation_weight
+            )
             return_dict["landmark_separation_loss"] = landmark_separation_loss
             loss += landmark_separation_loss
-            print(f"landmark_separation_loss: {torch.stack(landmark_errors).mean()} >> scaled: {landmark_separation_loss}")
+            print(
+                f"landmark_separation_loss: {torch.stack(landmark_errors).mean()} >> scaled: {landmark_separation_loss}"
+            )
 
         if self.cfg.identity_separation:  # identity separation loss
             identity_errors = []
-            for i, (ref_image_tensor, gen_image_tensor) in enumerate(zip(pixel_values, decoded_gen_image)):
+            for i, (ref_image_tensor, gen_image_tensor) in enumerate(
+                zip(pixel_values, decoded_gen_image)
+            ):
                 ref_image_pil = self.adapter.tensor_to_pil(ref_image_tensor)
                 gen_image_pil = self.adapter.tensor_to_pil(gen_image_tensor)
 
-                identity_error = self.adapter.identity_loss(ref_image_pil, gen_image_pil)
+                identity_error = self.adapter.identity_loss(
+                    ref_image_pil, gen_image_pil
+                )
                 identity_errors.append(identity_error)
-        
+
             identity_separation_loss = torch.stack(identity_errors).mean()
             return_dict["identity_separation_loss"] = identity_separation_loss
             loss += identity_separation_loss
-            print(f"identity_separation_loss: {torch.stack(identity_errors).mean()} >> scaled: {identity_separation_loss}")
-
+            print(
+                f"identity_separation_loss: {torch.stack(identity_errors).mean()} >> scaled: {identity_separation_loss}"
+            )
 
         return_dict["loss"] = loss
-        print(f"loss: {loss}, denoise_loss: {denoise_loss}, localization_loss: {localization_loss}")
+        print(
+            f"loss: {loss}, denoise_loss: {denoise_loss}, localization_loss: {localization_loss}"
+        )
         torch.cuda.empty_cache()
         return return_dict
 
     @torch.no_grad()
-    def generate_images(self, latents, timesteps, encoder_hidden_states, scheduler, num_inference_steps):
+    def generate_images(
+        self, latents, timesteps, encoder_hidden_states, scheduler, num_inference_steps
+    ):
         for i, t in enumerate(timesteps):
             latent_model_input = scheduler.scale_model_input(latents, t)
 
@@ -628,7 +699,9 @@ class LossAdapter:
     def __init__(self) -> None:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.mtcnn = MTCNN(margin=0, keep_all=True, device=self.device)
-        self.embedding_model = InceptionResnetV1(pretrained="vggface2").eval().to(self.device)
+        self.embedding_model = (
+            InceptionResnetV1(pretrained="vggface2").eval().to(self.device)
+        )
         self.to_pil = T.ToPILImage()
 
     def _detect_faces(self, image_pil: Image) -> torch.Tensor:
@@ -640,10 +713,18 @@ class LossAdapter:
         return self.model.detect(image, landmarks=landmarks)
 
     def _get_embedding(self, image_tensor: torch.Tensor) -> np.ndarray:
-        return self.embedding_model(image_tensor.unsqueeze(0).to(self.device)).detach().cpu().numpy().flatten()
+        return (
+            self.embedding_model(image_tensor.unsqueeze(0).to(self.device))
+            .detach()
+            .cpu()
+            .numpy()
+            .flatten()
+        )
 
     def _calc_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
-        return np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
+        return np.dot(embedding1, embedding2) / (
+            np.linalg.norm(embedding1) * np.linalg.norm(embedding2)
+        )
 
     def calc_face_similarity(self, image1: Image, image2: Image) -> float:
         image1_tensor = self._detect_faces(image1)[0]
@@ -680,7 +761,9 @@ class LossAdapter:
             stack_embedding_image2.append(embedding2)
 
         if not stack_embedding_image1 or not stack_embedding_image2:
-            raise ValueError("No embeddings could be calculated from the rotated images.")
+            raise ValueError(
+                "No embeddings could be calculated from the rotated images."
+            )
 
         # average
         mean_embedding_image1 = np.mean(stack_embedding_image1, axis=0)
@@ -689,7 +772,10 @@ class LossAdapter:
         return self._calc_similarity(mean_embedding_image1, mean_embedding_image2)
 
     def identity_loss(self, image1: Image, image2: Image) -> float:
-        return abs(calc_face_essential_similarity(image1, image2) - self.calc_face_similarity(image1, image2))
+        return abs(
+            self.adapter.calc_face_essential_similarity(image1, image2)
+            - self.adapter.calc_face_similarity(image1, image2)
+        )
 
 
 def extract_focus_region(image, point, face_rate):

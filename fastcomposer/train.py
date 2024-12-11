@@ -12,6 +12,7 @@ import hydra
 import torch
 import torch.utils.checkpoint
 import transformers
+import wandb
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import set_seed
@@ -21,9 +22,7 @@ from diffusers.utils.import_utils import is_xformers_available
 from omegaconf import DictConfig, OmegaConf
 from tqdm.auto import tqdm
 from transformers import CLIPTokenizer
-from icecream import ic
 
-import wandb
 from fastcomposer.data import FastComposerDataset, get_data_loader
 from fastcomposer.model import FastComposerModel
 from fastcomposer.transforms import (
@@ -70,7 +69,9 @@ def train(cfg: DictConfig) -> None:
         handlers=(
             [
                 logging.StreamHandler(sys.stdout),
-                logging.FileHandler(os.path.join(cfg.logging_dir, f"{str_m_d_y_h_m_s}.log")),
+                logging.FileHandler(
+                    os.path.join(cfg.logging_dir, f"{str_m_d_y_h_m_s}.log")
+                ),
             ]
             if accelerator.is_main_process
             else []
@@ -90,7 +91,9 @@ def train(cfg: DictConfig) -> None:
         set_seed(cfg.seed)
 
     # Load scheduler, tokenizer and models.
-    noise_scheduler = DDPMScheduler.from_pretrained(cfg.pretrained_model_path, subfolder="scheduler")
+    noise_scheduler = DDPMScheduler.from_pretrained(
+        cfg.pretrained_model_path, subfolder="scheduler"
+    )
     tokenizer = CLIPTokenizer.from_pretrained(
         cfg.pretrained_model_path,
         subfolder="tokenizer",
@@ -112,7 +115,9 @@ def train(cfg: DictConfig) -> None:
         param.data = param.data.to(weight_dtype)
 
     if cfg.load_model is not None:
-        model.load_state_dict(torch.load(Path(cfg.load_model) / "pytorch_model.bin", map_location="cpu"))
+        model.load_state_dict(
+            torch.load(Path(cfg.load_model) / "pytorch_model.bin", map_location="cpu")
+        )
 
     model.unet.requires_grad_(True)
     model.unet.to(torch.float32)
@@ -128,8 +133,12 @@ def train(cfg: DictConfig) -> None:
     if cfg.train_image_encoder:
         if cfg.image_encoder_trainable_layers > 0:
             for idx in range(cfg.image_encoder_trainable_layers):
-                model.image_encoder.vision_model.encoder.layers[-1 - idx].requires_grad_(True)
-                model.image_encoder.vision_model.encoder.layers[-1 - idx].to(torch.float32)
+                model.image_encoder.vision_model.encoder.layers[
+                    -1 - idx
+                ].requires_grad_(True)
+                model.image_encoder.vision_model.encoder.layers[-1 - idx].to(
+                    torch.float32
+                )
         else:
             model.image_encoder.requires_grad_(True)
             model.image_encoder.to(torch.float32)
@@ -154,7 +163,9 @@ def train(cfg: DictConfig) -> None:
         if is_xformers_available():
             model.unet.enable_xformers_memory_efficient_attention()
         else:
-            raise ValueError("xformers is not available. Make sure it is installed correctly")
+            raise ValueError(
+                "xformers is not available. Make sure it is installed correctly"
+            )
 
     if cfg.gradient_checkpointing:
         if cfg.train_text_encoder:
@@ -167,13 +178,18 @@ def train(cfg: DictConfig) -> None:
 
     if cfg.scale_lr:
         cfg.learning_rate = (
-            cfg.learning_rate * cfg.gradient_accumulation_steps * cfg.train_batch_size * accelerator.num_processes
+            cfg.learning_rate
+            * cfg.gradient_accumulation_steps
+            * cfg.train_batch_size
+            * accelerator.num_processes
         )
 
     optimizer_cls = torch.optim.AdamW
 
     unet_params = list([p for p in model.unet.parameters() if p.requires_grad])
-    other_params = list([p for n, p in model.named_parameters() if p.requires_grad and "unet" not in n])
+    other_params = list(
+        [p for n, p in model.named_parameters() if p.requires_grad and "unet" not in n]
+    )
     parameters = unet_params + other_params
 
     optimizer = optimizer_cls(
@@ -218,7 +234,9 @@ def train(cfg: DictConfig) -> None:
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / cfg.gradient_accumulation_steps)
+    num_update_steps_per_epoch = math.ceil(
+        len(train_dataloader) / cfg.gradient_accumulation_steps
+    )
     if cfg.max_train_steps is None:
         cfg.max_train_steps = cfg.num_train_epochs * num_update_steps_per_epoch
         overrode_max_train_steps = True
@@ -240,7 +258,9 @@ def train(cfg: DictConfig) -> None:
         model.module.ema_param.to(accelerator.device)
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / cfg.gradient_accumulation_steps)
+    num_update_steps_per_epoch = math.ceil(
+        len(train_dataloader) / cfg.gradient_accumulation_steps
+    )
     if overrode_max_train_steps:
         cfg.max_train_steps = cfg.num_train_epochs * num_update_steps_per_epoch
     # Afterwards we recalculate our number of training epochs
@@ -257,13 +277,19 @@ def train(cfg: DictConfig) -> None:
         if param.requires_grad:
             logger.info(f"Trainable parameter: {name} with shape {param.shape}")
 
-    total_batch_size = cfg.train_batch_size * accelerator.num_processes * cfg.gradient_accumulation_steps
+    total_batch_size = (
+        cfg.train_batch_size
+        * accelerator.num_processes
+        * cfg.gradient_accumulation_steps
+    )
 
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
     logger.info(f"  Num Epochs = {cfg.num_train_epochs}")
     logger.info(f"  Instantaneous batch size per device = {cfg.train_batch_size}")
-    logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
+    logger.info(
+        f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}"
+    )
     logger.info(f"  Gradient Accumulation steps = {cfg.gradient_accumulation_steps}")
     logger.info(f"  Total optimization steps = {cfg.max_train_steps}")
     global_step = 0
@@ -320,24 +346,33 @@ def train(cfg: DictConfig) -> None:
                 else:
                     return_dict = model(batch, noise_scheduler)
 
-                avg_denoise_loss = accelerator.gather(return_dict["denoise_loss"].repeat(cfg.train_batch_size)).mean()
-                denoise_loss += avg_denoise_loss.item() / cfg.gradient_accumulation_steps
+                avg_denoise_loss = accelerator.gather(
+                    return_dict["denoise_loss"].repeat(cfg.train_batch_size)
+                ).mean()
+                denoise_loss += (
+                    avg_denoise_loss.item() / cfg.gradient_accumulation_steps
+                )
 
                 if "localization_loss" in return_dict:
                     avg_localization_loss = accelerator.gather(
                         return_dict["localization_loss"].repeat(cfg.train_batch_size)
                     ).mean()
-                    localization_loss += avg_localization_loss.item() / cfg.gradient_accumulation_steps
+                    localization_loss += (
+                        avg_localization_loss.item() / cfg.gradient_accumulation_steps
+                    )
 
                 if "face_separation_loss" in return_dict:
                     avg_face_separation_loss = accelerator.gather(
                         return_dict["face_separation_loss"].repeat(cfg.train_batch_size)
                     ).mean()
                     # 各値を float に変換してから計算
-                    avg_face_separation_loss_value = float(avg_face_separation_loss.item()) / float(
-                        cfg.gradient_accumulation_steps
+                    avg_face_separation_loss_value = float(
+                        avg_face_separation_loss.item()
+                    ) / float(cfg.gradient_accumulation_steps)
+                    adjusted_loss = (
+                        float(cfg.face_separation_delta)
+                        - avg_face_separation_loss_value
                     )
-                    adjusted_loss = float(cfg.face_separation_delta) - avg_face_separation_loss_value
                     # 条件分岐で adjusted_loss を加算
                     if adjusted_loss > 0.0:
                         face_separation_loss += adjusted_loss
@@ -347,13 +382,18 @@ def train(cfg: DictConfig) -> None:
 
                 if "expression_separation_loss" in return_dict:
                     avg_face_separation_loss = accelerator.gather(
-                        return_dict["expression_separation_loss"].repeat(cfg.train_batch_size)
+                        return_dict["expression_separation_loss"].repeat(
+                            cfg.train_batch_size
+                        )
                     ).mean()
                     # 各値を float に変換してから計算
-                    avg_face_separation_loss_value = float(avg_face_separation_loss.item()) / float(
-                        cfg.gradient_accumulation_steps
+                    avg_face_separation_loss_value = float(
+                        avg_face_separation_loss.item()
+                    ) / float(cfg.gradient_accumulation_steps)
+                    adjusted_loss = (
+                        float(cfg.face_separation_delta)
+                        - avg_face_separation_loss_value
                     )
-                    adjusted_loss = float(cfg.face_separation_delta) - avg_face_separation_loss_value
                     # 条件分岐で adjusted_loss を加算
                     if adjusted_loss > 0.0:
                         face_separation_loss += adjusted_loss
@@ -363,9 +403,15 @@ def train(cfg: DictConfig) -> None:
 
                 # Adjust total loss depending on cfg.pass_face_separation_loss
                 if cfg.pass_face_separation_loss:
-                    loss = avg_denoise_loss + avg_localization_loss + face_separation_loss
+                    loss = (
+                        avg_denoise_loss + avg_localization_loss + face_separation_loss
+                    )
                 else:
-                    loss = avg_denoise_loss + avg_localization_loss + torch.tensor(face_separation_loss).detach()
+                    loss = (
+                        avg_denoise_loss
+                        + avg_localization_loss
+                        + torch.tensor(face_separation_loss).detach()
+                    )
 
                 # Gather the losses across all processes for logging (if we use distributed training).
                 avg_loss = accelerator.gather(loss.repeat(cfg.train_batch_size)).mean()
@@ -419,16 +465,26 @@ def train(cfg: DictConfig) -> None:
                 localization_loss = 0.0
                 face_separation_loss = 0.0
 
-                if global_step % cfg.checkpointing_steps == 0 and accelerator.is_local_main_process:
-                    save_path = os.path.join(cfg.output_dir, f"checkpoint-{global_step}")
+                if (
+                    global_step % cfg.checkpointing_steps == 0
+                    and accelerator.is_local_main_process
+                ):
+                    save_path = os.path.join(
+                        cfg.output_dir, f"checkpoint-{global_step}"
+                    )
                     accelerator.save_state(save_path)
                     logger.info(f"Saved state to {save_path}")
                     if cfg.keep_only_last_checkpoint:
                         # Remove all other checkpoints
                         for file in os.listdir(cfg.output_dir):
-                            if file.startswith("checkpoint") and file != os.path.basename(save_path):
+                            if file.startswith(
+                                "checkpoint"
+                            ) and file != os.path.basename(save_path):
                                 ckpt_num = int(file.split("-")[1])
-                                if cfg.keep_interval is None or ckpt_num % cfg.keep_interval != 0:
+                                if (
+                                    cfg.keep_interval is None
+                                    or ckpt_num % cfg.keep_interval != 0
+                                ):
                                     logger.info(f"Removing {file}")
                                     shutil.rmtree(os.path.join(cfg.output_dir, file))
 
