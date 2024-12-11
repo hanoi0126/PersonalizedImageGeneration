@@ -34,10 +34,9 @@ from fastcomposer.transforms import (
 logger = get_logger(__name__)
 
 wandb.init(
-    project="personalization-training",
+    project="beyond-replication",
     entity="hiroto-weblab",
     name=datetime.now().strftime("%Y-%m-%d/%H-%M-%S"),
-    # settings=wandb.Settings(mode="disabled"),
 )
 
 

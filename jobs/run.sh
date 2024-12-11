@@ -13,8 +13,9 @@ source venv/bin/activate
 source jobs/import-env.sh .env
 
 # create log directory
-LOG_DIR="outputs/$(date '+%Y-%m-%d/%H-%M-%S')"
+LOG_DIR="logs/$(date '+%Y-%m-%d/%H-%M-%S')"
 mkdir -p ${LOG_DIR}
+mkdir -p $HF_HOME $HF_DATASETS_CACHE $TORCH_HOME
 
 # record job information
 cat <<EOF >> ${LOG_DIR}/job_output.log
@@ -32,7 +33,7 @@ cat <<EOF >> ${LOG_DIR}/job_output.log
 === Main Output ===
 EOF
 
-PYTHONPATH="$PWD:$PYTHONPATH"
+export PYTHONPATH="$PWD:$PYTHONPATH"
 
 CUDA_VISIBLE_DEVICES=0 accelerate launch \
     --mixed_precision=bf16 \
