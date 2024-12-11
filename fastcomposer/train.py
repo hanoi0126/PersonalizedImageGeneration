@@ -12,7 +12,6 @@ import hydra
 import torch
 import torch.utils.checkpoint
 import transformers
-import wandb
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import set_seed
@@ -23,6 +22,7 @@ from omegaconf import DictConfig, OmegaConf
 from tqdm.auto import tqdm
 from transformers import CLIPTokenizer
 
+import wandb
 from fastcomposer.data import FastComposerDataset, get_data_loader
 from fastcomposer.model import FastComposerModel
 from fastcomposer.transforms import (
@@ -334,6 +334,10 @@ def train(cfg: DictConfig) -> None:
         denoise_loss = 0.0
         localization_loss = 0.0
         face_separation_loss = 0.0
+        expression_separation_loss = 0.0
+        labdmark_separation_loss = 0.0
+        identity_separation_loss = 0.0
+
         for step, batch in enumerate(train_dataloader):
             progress_bar.set_description("Global step: {}".format(global_step))
 
@@ -351,6 +355,7 @@ def train(cfg: DictConfig) -> None:
                 denoise_loss += (
                     avg_denoise_loss.item() / cfg.gradient_accumulation_steps
                 )
+                loss = return_dict["denoise_loss"] + return_dict["localization_loss"]
 
                 if "localization_loss" in return_dict:
                     avg_localization_loss = accelerator.gather(
@@ -368,48 +373,80 @@ def train(cfg: DictConfig) -> None:
                     avg_face_separation_loss_value = float(
                         avg_face_separation_loss.item()
                     ) / float(cfg.gradient_accumulation_steps)
-                    adjusted_loss = (
-                        float(cfg.face_separation_delta)
-                        - avg_face_separation_loss_value
+                    adjusted_face_loss = avg_face_separation_loss_value - float(
+                        cfg.face_separation_delta
                     )
                     # 条件分岐で adjusted_loss を加算
-                    if adjusted_loss > 0.0:
-                        face_separation_loss += adjusted_loss
+                    if adjusted_face_loss > 0.0:
+                        face_separation_loss += adjusted_face_loss
+                        loss += adjusted_face_loss
                         logging.info(
-                            f"face_separation_loss: {face_separation_loss}, adjusted_loss: {adjusted_loss}, in image: {batch['image_ids']}"
+                            f"face_separation_loss: {face_separation_loss}, adjusted_loss: {adjusted_face_loss}, in image: {batch['image_ids']}"
                         )
 
                 if "expression_separation_loss" in return_dict:
-                    avg_face_separation_loss = accelerator.gather(
+                    avg_expression_separation_loss = accelerator.gather(
                         return_dict["expression_separation_loss"].repeat(
                             cfg.train_batch_size
                         )
                     ).mean()
                     # 各値を float に変換してから計算
-                    avg_face_separation_loss_value = float(
-                        avg_face_separation_loss.item()
+                    avg_expression_separation_loss_value = float(
+                        avg_expression_separation_loss.item()
                     ) / float(cfg.gradient_accumulation_steps)
-                    adjusted_loss = (
-                        float(cfg.face_separation_delta)
-                        - avg_face_separation_loss_value
+                    adjusted_expression_loss = (
+                        avg_expression_separation_loss_value
+                        - float(cfg.face_separation_delta)
                     )
                     # 条件分岐で adjusted_loss を加算
-                    if adjusted_loss > 0.0:
-                        face_separation_loss += adjusted_loss
+                    if adjusted_expression_loss > 0.0:
+                        expression_separation_loss += adjusted_expression_loss
+                        loss += adjusted_expression_loss
                         logging.info(
-                            f"expression_separation_loss: {face_separation_loss}, adjusted_loss: {adjusted_loss}, in image: {batch['image_ids']}"
+                            f"expression_separation_loss: {expression_separation_loss}, adjusted_loss: {adjusted_expression_loss}, in image: {batch['image_ids']}"
                         )
 
-                # Adjust total loss depending on cfg.pass_face_separation_loss
-                if cfg.pass_face_separation_loss:
-                    loss = (
-                        avg_denoise_loss + avg_localization_loss + face_separation_loss
+                if "landmark_separation_loss" in return_dict:
+                    avg_landmark_separation_loss = accelerator.gather(
+                        return_dict["landmark_separation_loss"].repeat(
+                            cfg.train_batch_size
+                        )
+                    ).mean()
+                    # 各値を float に変換してから計算
+                    avg_landmark_separation_loss_value = float(
+                        avg_landmark_separation_loss.item()
+                    ) / float(cfg.gradient_accumulation_steps)
+                    adjusted_landmark_loss = avg_landmark_separation_loss_value - float(
+                        cfg.face_separation_delta
                     )
-                else:
-                    loss = (
-                        avg_denoise_loss
-                        + avg_localization_loss
-                        + torch.tensor(face_separation_loss).detach()
+                    # 条件分岐で adjusted_loss を加算
+                    if adjusted_landmark_loss > 0.0:
+                        labdmark_separation_loss += adjusted_landmark_loss
+                        loss += adjusted_landmark_loss
+                        logging.info(
+                            f"landmark_separation_loss: {labdmark_separation_loss}, adjusted_loss: {adjusted_landmark_loss}, in image: {batch['image_ids']}"
+                        )
+
+                if "identity_separation_loss" in return_dict:
+                    avg_identity_separation_loss = accelerator.gather(
+                        return_dict["identity_separation_loss"].repeat(
+                            cfg.train_batch_size
+                        )
+                    ).mean()
+                    # 各値を float に変換してから計算
+                    avg_identity_separation_loss_value = float(
+                        avg_identity_separation_loss.item()
+                    ) / float(cfg.gradient_accumulation_steps)
+                    adjusted_identity_loss = avg_identity_separation_loss_value - float(
+                        cfg.face_separation_delta
+                    )
+
+                    # 条件分岐で adjusted_loss を加算
+                    if adjusted_identity_loss > 0.0:
+                        identity_separation_loss += adjusted_identity_loss
+                        loss += adjusted_identity_loss
+                    logging.info(
+                        f"identity_separation_loss: {identity_separation_loss}, adjusted_identity_loss: {adjusted_identity_loss}, in image: {batch['image_ids']}"
                     )
 
                 # Gather the losses across all processes for logging (if we use distributed training).
@@ -431,13 +468,23 @@ def train(cfg: DictConfig) -> None:
                     model.module.ema_param.step(model.module.unet.parameters())
                 progress_bar.update(1)
                 global_step += 1
+                log_dict = {
+                    "train_loss": train_loss,
+                    "denoise_loss": denoise_loss,
+                }
+                if "localization_loss" in return_dict:
+                    log_dict["localization_loss"] = localization_loss
+                if "face_separation_loss" in return_dict:
+                    log_dict["face_separation_loss"] = face_separation_loss
+                if "expression_separation_loss" in return_dict:
+                    log_dict["expression_separation_loss"] = expression_separation_loss
+                if "landmark_separation_loss" in return_dict:
+                    log_dict["landmark_separation_loss"] = labdmark_separation_loss
+                if "identity_separation_loss" in return_dict:
+                    log_dict["identity_separation_loss"] = identity_separation_loss
+
                 accelerator.log(
-                    {
-                        "train_loss": train_loss,
-                        "denoise_loss": denoise_loss,
-                        "localization_loss": localization_loss,
-                        "face_separation_loss": face_separation_loss,
-                    },
+                    log_dict,
                     step=global_step,
                 )
 
@@ -463,6 +510,9 @@ def train(cfg: DictConfig) -> None:
                 denoise_loss = 0.0
                 localization_loss = 0.0
                 face_separation_loss = 0.0
+                expression_separation_loss = 0.0
+                labdmark_separation_loss = 0.0
+                identity_separation_loss = 0.0
 
                 if (
                     global_step % cfg.checkpointing_steps == 0

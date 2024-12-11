@@ -1,5 +1,4 @@
 import gc
-import time
 import types
 import warnings
 from typing import Optional, Tuple, Union
@@ -634,10 +633,10 @@ class FastComposerModel(nn.Module):
 
                 # calculate the distance between the points
                 for ref_point, gen_point in zip(ref_points, gen_points):
-                    ref_point = torch.tensor(ref_point).to(gen_point.device).float()
-                    gen_point = gen_point.float()
-
-                    mse_loss = F.mse_loss(gen_point, ref_point, reduction="mean")
+                    # それぞれのランドマークの点の距離の平均を計算
+                    mse_loss = F.mse_loss(
+                        gen_point, ref_point, reduction="mean"
+                    )  # TODO: 修正必要
                     landmark_errors.append(mse_loss)
 
             landmark_separation_loss = (
@@ -663,11 +662,15 @@ class FastComposerModel(nn.Module):
                 )
                 identity_errors.append(identity_error)
 
-            identity_separation_loss = torch.stack(identity_errors).mean()
+            # identity errors は numpy で返ってくる
+            identity_separation_loss = (
+                np.mean(identity_errors)
+                * self.cfg.identity_separation_weight
+            )
             return_dict["identity_separation_loss"] = identity_separation_loss
             loss += identity_separation_loss
             print(
-                f"identity_separation_loss: {torch.stack(identity_errors).mean()} >> scaled: {identity_separation_loss}"
+                f"identity_separation_loss: {np.mean(identity_errors)} >> scaled: {identity_separation_loss}"
             )
 
         return_dict["loss"] = loss
@@ -710,7 +713,7 @@ class LossAdapter:
         return self.mtcnn(image_pil)
 
     def detect(self, image, landmarks=False):
-        return self.model.detect(image, landmarks=landmarks)
+        return self.mtcnn.detect(image, landmarks=landmarks)
 
     def _get_embedding(self, image_tensor: torch.Tensor) -> np.ndarray:
         return (
@@ -742,21 +745,17 @@ class LossAdapter:
         stack_embedding_image1 = []
         stack_embedding_image2 = []
         for angle in range(0, 360, 10):
-            times = [time.time()]
             image1_rotated = image1.rotate(angle)
             image2_rotated = image2.rotate(angle)
-            times.append(time.time())
-            # print(f"rotate time: {times[-1] - times[-2]}")
+
             image1_tensor = self._detect_faces(image1_rotated)
             image2_tensor = self._detect_faces(image2_rotated)
-            times.append(time.time())
-            # print(f"detect time: {times[-1] - times[-2]}")
+
             if image1_tensor is None or image2_tensor is None:
                 continue
             embedding1 = self._get_embedding(image1_tensor[0])
             embedding2 = self._get_embedding(image2_tensor[0])
-            times.append(time.time())
-            # print(f"embedding time: {times[-1] - times[-2]}")
+
             stack_embedding_image1.append(embedding1)
             stack_embedding_image2.append(embedding2)
 
@@ -772,10 +771,17 @@ class LossAdapter:
         return self._calc_similarity(mean_embedding_image1, mean_embedding_image2)
 
     def identity_loss(self, image1: Image, image2: Image) -> float:
-        return abs(
-            self.adapter.calc_face_essential_similarity(image1, image2)
-            - self.adapter.calc_face_similarity(image1, image2)
-        )
+        try:
+            essential_sim = self.calc_face_essential_similarity(image1, image2)
+            face_sim = self.calc_face_similarity(image1, image2)
+            return abs(
+                self.calc_face_essential_similarity(image1, image2)
+                - self.calc_face_similarity(image1, image2)
+            )
+        except Exception as e:
+            print(e)
+            return 0.0
+
 
 
 def extract_focus_region(image, point, face_rate):

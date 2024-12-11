@@ -1,6 +1,7 @@
 .cache/
 data/
 .env
+logs/
 models/
 outputs/
 *.out
