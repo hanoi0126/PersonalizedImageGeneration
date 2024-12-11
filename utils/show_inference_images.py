@@ -1,9 +1,12 @@
 import os
-import pandas as pd
+
 import matplotlib.pyplot as plt
+import pandas as pd
 
 
-def save_grid_image(image_dir, ncol=4, vlm_result=None, landmark_result=None, sort_with_score=None) -> None:
+def save_grid_image(
+    image_dir, ncol=4, vlm_result=None, landmark_result=None, sort_with_score=None
+) -> None:
     images = [
         (i, plt.imread(f"{image_dir}/{i}"))
         for i in sorted(os.listdir(image_dir))
@@ -18,7 +21,9 @@ def save_grid_image(image_dir, ncol=4, vlm_result=None, landmark_result=None, so
             clip_i = df[df["image_path"] == filepath]["sim_img2img"].values[0]
             clip_t = df[df["image_path"] == filepath]["sim_txt2img"].values[0]
             score = df[df["image_path"] == filepath]["face_separation"].values[0]
-            images_and_score.append((filename, plt.imread(filepath), score, clip_i, clip_t))
+            images_and_score.append(
+                (filename, plt.imread(filepath), score, clip_i, clip_t)
+            )
         images_and_score = sorted(images_and_score, key=lambda x: x[2], reverse=True)
         images = [(filename, image) for filename, image, _, _, _ in images_and_score]
 
@@ -52,10 +57,15 @@ def save_grid_image(image_dir, ncol=4, vlm_result=None, landmark_result=None, so
 if __name__ == "__main__":
 
     # set image_dir to the directory containing the images
-    image_dir = "outputs/2024-11-12/13-20-15"
+    image_dir = "data/celeba_inpaint_2"
 
     vlm_result = None
     landmark_result = None
-    sort_with_score = "outputs/2024-11-13/12-25-25/result.csv"
+    sort_with_score = None
 
-    save_grid_image(image_dir, vlm_result=vlm_result, landmark_result=landmark_result, sort_with_score=sort_with_score)
+    save_grid_image(
+        image_dir,
+        vlm_result=vlm_result,
+        landmark_result=landmark_result,
+        sort_with_score=sort_with_score,
+    )

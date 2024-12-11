@@ -4,7 +4,7 @@ fi
 
 git config --global --add safe.directory /workspace
 
-poetry run accelerate launch \
+CUDA_VISIBLE_DEVICES=0 poetry run accelerate launch \
     --mixed_precision=bf16 \
     --machine_rank 0 \
     --num_machines 1 \

@@ -7,7 +7,9 @@ logging_dir: outputs/${now_dir}/logs
 face_separation: True
 face_separation_weight: 1e-3
 face_separation_delta: 0.5
-pass_face_separation_loss: False
+pass_face_separation_loss: True
+face_expression: False
+face_part_rate: 0.1
 
 
 # others
@@ -95,7 +97,7 @@ lr_warmup_steps: 500
 checkpointing_steps: 200
 keep_only_last_checkpoint: True
 keep_interval: 10000
-resume_from_checkpoint: models/fastcomposer
+resume_from_checkpoint: models/fastcomposer-for-train
 global_step: 0
 
 variance_type:

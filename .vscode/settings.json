@@ -1,26 +1,27 @@
 {
-    "python.linting.flake8Enabled": true,
-    "python.linting.enabled": true,
-    "python.linting.mypyEnabled": true,
-    "python.linting.pylintEnabled": true,
-    "python.formatting.provider": "black",
-    "python.linting.pylintArgs": ["--disable", "line-too-long,bad-continuation"],
-    "python.linting.mypyArgs": ["--disallow-untyped-defs"],
-    "flake8.args": [
-        "--config=.venv/bin/flake8",
-        "--max-line-length=119",
-        "--max-complexity=10",
-        "--ignore=E203,W503",
-        "--exclude=.venv,.git,__pycache__"
-    ],
-    "flake8.path": [".venv/bin/flake8"],
-    "isort.args": ["--profile", "black"],
-    "black-formatter.args": ["--line-length=119"],
-    "black-formatter.path": [".venv/bin/black"],
-    "[python]": {
-        "editor.formatOnType": true,
-        "editor.formatOnPaste": true,
-        "editor.formatOnSave": true
-    },
-    "mypy-type-checker.path": [".venv/bin/mypy"]
+  "python.linting.flake8Enabled": true,
+  "python.linting.enabled": true,
+  "python.linting.mypyEnabled": true,
+  "python.linting.pylintEnabled": true,
+  "python.formatting.provider": "black",
+  "python.linting.pylintArgs": ["--disable", "line-too-long,bad-continuation"],
+  "python.linting.mypyArgs": ["--disallow-untyped-defs"],
+  "flake8.args": [
+    "--config=.venv/bin/flake8",
+    "--max-line-length=119",
+    "--max-complexity=10",
+    "--ignore=E203,W503",
+    "--exclude=.venv,.git,__pycache__"
+  ],
+  "flake8.path": [".venv/bin/flake8"],
+  "isort.args": ["--profile", "black"],
+  "black-formatter.args": ["--line-length=119"],
+  "black-formatter.path": [".venv/bin/black"],
+  "[python]": {
+    "editor.formatOnType": true,
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true
+  },
+  "mypy-type-checker.path": [".venv/bin/mypy"],
+  "python.analysis.extraPaths": ["/workspace/.venv/bin/python/site-packages"]
 }

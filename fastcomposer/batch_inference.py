@@ -85,90 +85,105 @@ def main(cfg: DictConfig) -> None:
 
     object_transforms = get_object_transforms(cfg)
 
-    for idx, caption in enumerate(cfg.caption_list):
-        demo_dataset = DemoDataset(
-            test_caption=caption,
-            test_reference_folder=cfg.reference_dir,
-            tokenizer=tokenizer,
-            object_transforms=object_transforms,
-            device=accelerator.device,
-            max_num_objects=cfg.max_num_objects,
-        )
+    # ref dir の中にディレクトリがあれば
+    if os.path.isdir(os.path.join(cfg.reference_dir, os.listdir(cfg.reference_dir)[0])):
+        iteration = len(os.listdir(cfg.reference_dir))
+    else:
+        iteration = 1
 
-        image_ids = os.listdir(cfg.reference_dir)
-        print(f"Image IDs: {image_ids}")
-        demo_dataset.set_image_ids(image_ids)
+    for iter_idx in range(iteration):
+        for idx, caption in enumerate(cfg.caption_list):
+            if iteration != 1:
+                reference_dir = os.path.join(cfg.reference_dir, sorted(os.listdir(cfg.reference_dir))[iter_idx])
+                print(f"Reference dir: {reference_dir}")
+                if os.path.basename(reference_dir) in ["000612", "000667", "001603", "002088", "002464", "002880", "002929", "002937", "004153"]:
+                    caption = caption.replace("man", "woman")
+            else:
+                reference_dir = cfg.reference_dir
 
-        unique_token = "<|image|>"
-
-        prompt = caption
-        prompt_text_only = prompt.replace(unique_token, "")
-
-        os.makedirs(cfg.output_dir, exist_ok=True)
-
-        batch = demo_dataset.get_data()
-
-        input_ids = batch["input_ids"].to(accelerator.device)
-        # text = tokenizer.batch_decode(input_ids)[0]
-        print(prompt)
-        # print(input_ids)
-        image_token_mask = batch["image_token_mask"].to(accelerator.device)
-
-        # print(image_token_mask)
-        all_object_pixel_values = (
-            batch["object_pixel_values"].unsqueeze(0).to(accelerator.device)
-        )
-        num_objects = batch["num_objects"].unsqueeze(0).to(accelerator.device)
-
-        all_object_pixel_values = all_object_pixel_values.to(
-            dtype=weight_dtype, device=accelerator.device
-        )
-
-        object_pixel_values = all_object_pixel_values  # [:, 0, :, :, :]
-        if pipe.image_encoder is not None:
-            object_embeds = pipe.image_encoder(object_pixel_values)
-        else:
-            object_embeds = None
-
-        encoder_hidden_states = pipe.text_encoder(
-            input_ids, image_token_mask, object_embeds, num_objects
-        )[0]
-
-        encoder_hidden_states_text_only = pipe._encode_prompt(
-            prompt_text_only,
-            accelerator.device,
-            cfg.num_images_per_prompt,
-            do_classifier_free_guidance=False,
-        )
-
-        encoder_hidden_states = pipe.postfuse_module(
-            encoder_hidden_states,
-            object_embeds,
-            image_token_mask,
-            num_objects,
-        )
-
-        cross_attention_kwargs = {}
-
-        images = pipe.inference(
-            prompt_embeds=encoder_hidden_states,
-            num_inference_steps=cfg.inference_steps,
-            height=cfg.generate_height,
-            width=cfg.generate_width,
-            guidance_scale=cfg.guidance_scale,
-            num_images_per_prompt=cfg.num_images_per_prompt,
-            cross_attention_kwargs=cross_attention_kwargs,
-            prompt_embeds_text_only=encoder_hidden_states_text_only,
-            start_merge_step=cfg.start_merge_step,
-        ).images
-
-        for instance_id in range(cfg.num_images_per_prompt):
-            images[instance_id].save(
-                os.path.join(
-                    cfg.output_dir,
-                    f"output_{idx:03}_{instance_id:02}.png",
-                )
+            demo_dataset = DemoDataset(
+                test_caption=caption,
+                test_reference_folder=reference_dir,
+                tokenizer=tokenizer,
+                object_transforms=object_transforms,
+                device=accelerator.device,
+                max_num_objects=cfg.max_num_objects,
             )
+
+            image_ids = os.listdir(reference_dir)
+            print(f"Image IDs: {image_ids}")
+            demo_dataset.set_image_ids(image_ids)
+
+            unique_token = "<|image|>"
+
+            prompt = caption
+            prompt_text_only = prompt.replace(unique_token, "")
+
+            os.makedirs(cfg.output_dir, exist_ok=True)
+
+            batch = demo_dataset.get_data()
+
+            input_ids = batch["input_ids"].to(accelerator.device)
+            # text = tokenizer.batch_decode(input_ids)[0]
+            print(prompt)
+            # print(input_ids)
+            image_token_mask = batch["image_token_mask"].to(accelerator.device)
+
+            # print(image_token_mask)
+            all_object_pixel_values = (
+                batch["object_pixel_values"].unsqueeze(0).to(accelerator.device)
+            )
+            num_objects = batch["num_objects"].unsqueeze(0).to(accelerator.device)
+
+            all_object_pixel_values = all_object_pixel_values.to(
+                dtype=weight_dtype, device=accelerator.device
+            )
+
+            object_pixel_values = all_object_pixel_values  # [:, 0, :, :, :]
+            if pipe.image_encoder is not None:
+                object_embeds = pipe.image_encoder(object_pixel_values)
+            else:
+                object_embeds = None
+
+            encoder_hidden_states = pipe.text_encoder(
+                input_ids, image_token_mask, object_embeds, num_objects
+            )[0]
+
+            encoder_hidden_states_text_only = pipe._encode_prompt(
+                prompt_text_only,
+                accelerator.device,
+                cfg.num_images_per_prompt,
+                do_classifier_free_guidance=False,
+            )
+
+            encoder_hidden_states = pipe.postfuse_module(
+                encoder_hidden_states,
+                object_embeds,
+                image_token_mask,
+                num_objects,
+            )
+
+            cross_attention_kwargs = {}
+
+            images = pipe.inference(
+                prompt_embeds=encoder_hidden_states,
+                num_inference_steps=cfg.inference_steps,
+                height=cfg.generate_height,
+                width=cfg.generate_width,
+                guidance_scale=cfg.guidance_scale,
+                num_images_per_prompt=cfg.num_images_per_prompt,
+                cross_attention_kwargs=cross_attention_kwargs,
+                prompt_embeds_text_only=encoder_hidden_states_text_only,
+                start_merge_step=cfg.start_merge_step,
+            ).images
+
+            for instance_id in range(cfg.num_images_per_prompt):
+                images[instance_id].save(
+                    os.path.join(
+                        cfg.output_dir,
+                        f"output_{iter_idx:03}_{idx:03}_{instance_id:02}.png",
+                    )
+                )
 
 
 if __name__ == "__main__":

@@ -150,10 +150,10 @@ def stable_diffusion_call_with_references_delayed_conditioning(
         # 8. Post-processing
         image = self.decode_latents(latents)
 
-        # 9. Run safety checker
-        image, has_nsfw_concept = self.run_safety_checker(
-            image, device, prompt_embeds.dtype
-        )
+        # # 9. Run safety checker
+        # image, has_nsfw_concept = self.run_safety_checker(
+        #     image, device, prompt_embeds.dtype
+        # )
 
         # 10. Convert to PIL
         image = self.numpy_to_pil(image)
@@ -161,14 +161,16 @@ def stable_diffusion_call_with_references_delayed_conditioning(
         # 8. Post-processing
         image = self.decode_latents(latents)
 
-        # 9. Run safety checker
-        image, has_nsfw_concept = self.run_safety_checker(
-            image, device, prompt_embeds.dtype
-        )
+        # # 9. Run safety checker
+        # image, has_nsfw_concept = self.run_safety_checker(
+        #     image, device, prompt_embeds.dtype
+        # )
 
     # Offload last model to CPU
     if hasattr(self, "final_offload_hook") and self.final_offload_hook is not None:
         self.final_offload_hook.offload()
+
+    has_nsfw_concept = None
 
     if not return_dict:
         return (image, has_nsfw_concept)

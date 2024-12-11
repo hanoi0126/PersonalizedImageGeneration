@@ -4,6 +4,7 @@ import types
 import warnings
 from typing import Optional, Tuple, Union
 
+from icecream import ic
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -85,9 +86,7 @@ class FastComposerCLIPImageEncoder(CLIPPreTrainedModel):
 
         if h != self.image_size or w != self.image_size:
             h, w = self.image_size, self.image_size
-            object_pixel_values = F.interpolate(
-                object_pixel_values, (h, w), mode="bilinear", antialias=True
-            )
+            object_pixel_values = F.interpolate(object_pixel_values, (h, w), mode="bilinear", antialias=True)
 
         object_pixel_values = self.vision_processor(object_pixel_values)
         object_embeds = self.vision_model(object_pixel_values)[1]
@@ -107,14 +106,9 @@ def fuse_object_embeddings(
 
     batch_size, max_num_objects = object_embeds.shape[:2]
     seq_length = inputs_embeds.shape[1]
-    flat_object_embeds = object_embeds.view(
-        -1, object_embeds.shape[-2], object_embeds.shape[-1]
-    )
+    flat_object_embeds = object_embeds.view(-1, object_embeds.shape[-2], object_embeds.shape[-1])
 
-    valid_object_mask = (
-        torch.arange(max_num_objects, device=flat_object_embeds.device)[None, :]
-        < num_objects[:, None]
-    )
+    valid_object_mask = torch.arange(max_num_objects, device=flat_object_embeds.device)[None, :] < num_objects[:, None]
 
     valid_object_embeds = flat_object_embeds[valid_object_mask.flatten()]
 
@@ -186,19 +180,11 @@ class FastComposerTextEncoder(CLIPPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple, BaseModelOutputWithPooling]:
-        output_attentions = (
-            output_attentions
-            if output_attentions is not None
-            else self.config.output_attentions
-        )
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
-            output_hidden_states
-            if output_hidden_states is not None
-            else self.config.output_hidden_states
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
-        return_dict = (
-            return_dict if return_dict is not None else self.config.use_return_dict
-        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         input_shape = input_ids.size()
         input_ids = input_ids.view(-1, input_shape[-1])
@@ -206,9 +192,9 @@ class FastComposerTextEncoder(CLIPPreTrainedModel):
         hidden_states = self.embeddings(input_ids)
 
         bsz, seq_len = input_shape
-        causal_attention_mask = self._build_causal_attention_mask(
-            bsz, seq_len, hidden_states.dtype
-        ).to(hidden_states.device)
+        causal_attention_mask = self._build_causal_attention_mask(bsz, seq_len, hidden_states.dtype).to(
+            hidden_states.device
+        )
 
         # expand attention_mask
         if attention_mask is not None:
@@ -232,9 +218,7 @@ class FastComposerTextEncoder(CLIPPreTrainedModel):
         # casting to torch.int for onnx compatibility: argmax doesn't support int64 inputs with opset 14
         pooled_output = last_hidden_state[
             torch.arange(last_hidden_state.shape[0], device=last_hidden_state.device),
-            input_ids.to(dtype=torch.int, device=last_hidden_state.device).argmax(
-                dim=-1
-            ),
+            input_ids.to(dtype=torch.int, device=last_hidden_state.device).argmax(dim=-1),
         ]
 
         if not return_dict:
@@ -271,9 +255,7 @@ def unet_store_cross_attention_scores(unet, attention_scores, layers=5):
 
     def make_new_get_attention_scores_fn(name):
         def new_get_attention_scores(module, query, key, attention_mask=None):
-            attention_probs = module.old_get_attention_scores(
-                query, key, attention_mask
-            )
+            attention_probs = module.old_get_attention_scores(query, key, attention_mask)
             attention_scores[name] = attention_probs
             return attention_probs
 
@@ -286,9 +268,7 @@ def unet_store_cross_attention_scores(unet, attention_scores, layers=5):
             if isinstance(module.processor, AttnProcessor2_0):
                 module.set_processor(AttnProcessor())
             module.old_get_attention_scores = module.get_attention_scores
-            module.get_attention_scores = types.MethodType(
-                make_new_get_attention_scores_fn(name), module
-            )
+            module.get_attention_scores = types.MethodType(make_new_get_attention_scores_fn(name), module)
 
     return unet
 
@@ -308,13 +288,9 @@ class BalancedL1Loss(nn.Module):
         background_segmaps_sum = background_segmaps.sum(dim=2) + 1e-5
         object_segmaps_sum = object_segmaps.sum(dim=2) + 1e-5
 
-        background_loss = (object_token_attn_prob * background_segmaps).sum(
-            dim=2
-        ) / background_segmaps_sum
+        background_loss = (object_token_attn_prob * background_segmaps).sum(dim=2) / background_segmaps_sum
 
-        object_loss = (object_token_attn_prob * object_segmaps).sum(
-            dim=2
-        ) / object_segmaps_sum
+        object_loss = (object_token_attn_prob * object_segmaps).sum(dim=2) / object_segmaps_sum
 
         return background_loss - object_loss
 
@@ -335,29 +311,21 @@ def get_object_localization_loss_for_one_layer(
         object_segmaps, size=(size, size), mode="bilinear", antialias=True
     )  # (b, max_num_objects, size, size)
 
-    object_segmaps = object_segmaps.view(
-        b, max_num_objects, -1
-    )  # (b, max_num_objects, num_noise_latents)
+    object_segmaps = object_segmaps.view(b, max_num_objects, -1)  # (b, max_num_objects, num_noise_latents)
 
     num_heads = bxh // b
 
-    cross_attention_scores = cross_attention_scores.view(
-        b, num_heads, num_noise_latents, num_text_tokens
-    )
+    cross_attention_scores = cross_attention_scores.view(b, num_heads, num_noise_latents, num_text_tokens)
 
     # Gather object_token_attn_prob
     object_token_attn_prob = torch.gather(
         cross_attention_scores,
         dim=3,
-        index=object_token_idx.view(b, 1, 1, max_num_objects).expand(
-            b, num_heads, num_noise_latents, max_num_objects
-        ),
+        index=object_token_idx.view(b, 1, 1, max_num_objects).expand(b, num_heads, num_noise_latents, max_num_objects),
     )  # (b, num_heads, num_noise_latents, max_num_objects)
 
     object_segmaps = (
-        object_segmaps.permute(0, 2, 1)
-        .unsqueeze(1)
-        .expand(b, num_heads, num_noise_latents, max_num_objects)
+        object_segmaps.permute(0, 2, 1).unsqueeze(1).expand(b, num_heads, num_noise_latents, max_num_objects)
     )
 
     loss = loss_fn(object_token_attn_prob, object_segmaps)
@@ -387,9 +355,7 @@ def get_object_localization_loss(
 
 
 class FastComposerModel(nn.Module):
-    def __init__(
-        self, text_encoder: FastComposerTextEncoder, image_encoder, vae, unet, cfg
-    ):
+    def __init__(self, text_encoder: FastComposerTextEncoder, image_encoder, vae, unet, cfg):
         super().__init__()
         self.text_encoder = text_encoder
         self.image_encoder = image_encoder
@@ -410,6 +376,7 @@ class FastComposerModel(nn.Module):
         self.face_separation_weight = cfg.face_separation_weight
         self.facenet = FaceNet()
 
+        self.cfg = cfg
         self.output_dir = cfg.output_dir
 
         embed_dim = text_encoder.config.hidden_size
@@ -441,9 +408,7 @@ class FastComposerModel(nn.Module):
             subfolder="text_encoder",
             revision=cfg.revision,
         )
-        vae = AutoencoderKL.from_pretrained(
-            cfg.pretrained_model_path, subfolder="vae", revision=cfg.revision
-        )
+        vae = AutoencoderKL.from_pretrained(cfg.pretrained_model_path, subfolder="vae", revision=cfg.revision)
         unet = UNet2DConditionModel.from_pretrained(
             cfg.pretrained_model_path,
             subfolder="unet",
@@ -491,9 +456,7 @@ class FastComposerModel(nn.Module):
         noise = torch.randn_like(latents)
         bsz = latents.shape[0]
         # Sample a random timestep for each image
-        timesteps = torch.randint(
-            0, noise_scheduler.num_train_timesteps, (bsz,), device=latents.device
-        )
+        timesteps = torch.randint(0, noise_scheduler.num_train_timesteps, (bsz,), device=latents.device)
         timesteps = timesteps.long()
 
         # Add noise to the latents according to the noise magnitude at each timestep
@@ -503,9 +466,7 @@ class FastComposerModel(nn.Module):
         # (bsz, max_num_objects, num_image_tokens, dim)
         object_embeds = self.image_encoder(object_pixel_values)
 
-        encoder_hidden_states = self.text_encoder(
-            input_ids, image_token_mask, object_embeds, num_objects
-        )[
+        encoder_hidden_states = self.text_encoder(input_ids, image_token_mask, object_embeds, num_objects)[
             0
         ]  # (bsz, seq_len, dim)
 
@@ -522,9 +483,7 @@ class FastComposerModel(nn.Module):
         elif noise_scheduler.config.prediction_type == "v_prediction":
             target = noise_scheduler.get_velocity(latents, noise, timesteps)
         else:
-            raise ValueError(
-                f"Unknown prediction type {noise_scheduler.config.prediction_type}"
-            )
+            raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
 
         pred = self.unet(noisy_latents, timesteps, encoder_hidden_states).sample
 
@@ -560,9 +519,7 @@ class FastComposerModel(nn.Module):
         else:
             loss = denoise_loss
 
-        decoded_gen_image = self.generate_images(
-            latents, timesteps, encoder_hidden_states, noise_scheduler, 25
-        )
+        decoded_gen_image = self.generate_images(latents, timesteps, encoder_hidden_states, noise_scheduler, 25)
         # save_generated_images(decoded_gen_image, f"{self.output_dir}/generated_images")
         if return_image:
             to_pil = T.ToPILImage()
@@ -576,66 +533,87 @@ class FastComposerModel(nn.Module):
         # 追加: 顔の一致防止損失
         if self.face_separation:
             face_errors = []
-            for i, (ref_image_tensor, gen_image_tensor) in enumerate(
-                zip(pixel_values, decoded_gen_image)
-            ):
+            focus_errors = []
+            for i, (ref_image_tensor, gen_image_tensor) in enumerate(zip(pixel_values, decoded_gen_image)):
                 gen_image_pil = self.facenet.tensor_to_pil(gen_image_tensor)
                 ref_image_pil = self.facenet.tensor_to_pil(ref_image_tensor)
 
-                ref_boxes, ref_probs = self.facenet.detect(ref_image_pil)
-                gen_boxes, gen_probs = self.facenet.detect(gen_image_pil)
+                ref_boxes, ref_probs, ref_points = self.facenet.detect(ref_image_pil, landmarks=True)
+                gen_boxes, gen_probs, gen_points = self.facenet.detect(gen_image_pil, landmarks=True)
 
                 if ref_boxes is None or gen_boxes is None:
                     face_errors.append(torch.tensor(0.0))
+                    focus_errors.append(torch.tensor(0.0))
                     continue
 
                 ref_faces = []
                 gen_faces = []
                 for j, box in enumerate(ref_boxes):
-                    tensor_face = extract_face(
-                        ref_image_pil,
-                        box,
-                        # save_path=f"{self.output_dir}/face/detected_face_{i}_{j}_ref.png",
-                    )
+                    tensor_face = extract_face(ref_image_pil, box)
                     ref_faces.append(tensor_face)
                 for j, box in enumerate(gen_boxes):
-                    tensor_face = extract_face(
-                        gen_image_pil,
-                        box,
-                        # save_path=f"{self.output_dir}/face/detected_face_{i}_{j}_gen.png",
-                    )
+                    tensor_face = extract_face(gen_image_pil, box)
                     gen_faces.append(tensor_face)
 
-                for ref_face, gen_face in zip(ref_faces, gen_faces):
-                    # デバイスを統一してテンソルに変換
+                for ref_face, gen_face, ref_pts, gen_pts in zip(ref_faces, gen_faces, ref_points, gen_points):
                     ref_face = ref_face.to(gen_face.device).float()
                     gen_face = gen_face.float()
 
-                    # ピクセルごとの MSE を計算
+                    # ピクセルごとの MSE を計算して追加
                     mse_loss = F.mse_loss(gen_face, ref_face, reduction="mean")
                     face_errors.append(mse_loss)
 
+                    # 目と口に焦点を当てたロス項を追加
+                    if not self.cfg.face_expression:
+                        continue
+
+                    if ref_boxes is None or gen_boxes is None:
+                        focus_errors.append(torch.tensor(0.0))
+                        continue
+
+                    for idx, (ref_point, gen_point) in enumerate(zip(ref_pts, gen_pts)):
+                        # 各ポイントの周囲の矩形領域を切り取る
+                        face_rate = self.cfg.face_part_rate  # 設定された割合
+                        ref_focus_region = T.functional.to_tensor(
+                            extract_focus_region(ref_image_pil, ref_point, face_rate)
+                        )
+                        gen_focus_region = T.functional.to_tensor(
+                            extract_focus_region(gen_image_pil, gen_point, face_rate)
+                        )
+
+                        # サイズを合わせる処理
+                        min_height = min(ref_focus_region.shape[1], gen_focus_region.shape[1])
+                        min_width = min(ref_focus_region.shape[2], gen_focus_region.shape[2])
+
+                        # 小さい方に合わせてクロップ
+                        ref_focus_region = ref_focus_region[:, :min_height, :min_width]
+                        gen_focus_region = gen_focus_region[:, :min_height, :min_width]
+
+                        # テンソル化してデバイスに移動
+                        ref_focus_region = ref_focus_region.to(gen_face.device).float()
+                        gen_focus_region = gen_focus_region.float()
+
+                        # ピクセルごとの MSE を計算
+                        focus_mse_loss = F.mse_loss(gen_focus_region, ref_focus_region, reduction="mean")
+                        focus_errors.append(focus_mse_loss)
+
             # 全ての顔領域の平均ピクセル誤差を取得
-            print(f"face_errors: {face_errors}, timesteps: {timesteps}")
-            face_separation_loss = torch.stack(face_errors).mean()
-
-            return_dict["face_separation_loss"] = (
-                self.face_separation_weight * face_separation_loss
-            )
-
-            loss += self.face_separation_weight * face_separation_loss  # 重みを調整
+            if self.cfg.face_expression:
+                expression_separation_loss = torch.stack(focus_errors).mean()
+                return_dict["expression_separation_loss"] = self.face_separation_weight * expression_separation_loss
+                loss += self.face_separation_weight * expression_separation_loss  # 重みを調整
+            else:
+                face_separation_loss = torch.stack(face_errors).mean()
+                return_dict["face_separation_loss"] = self.face_separation_weight * face_separation_loss
+                loss += self.face_separation_weight * face_separation_loss  # 重みを調整
 
         return_dict["loss"] = loss
-        print(
-            f"loss: {loss}, denoise_loss: {denoise_loss}, localization_loss: {localization_loss}, face_separation_loss: {face_separation_loss}"
-        )
+        print(f"loss: {loss}, denoise_loss: {denoise_loss}, localization_loss: {localization_loss}")
         torch.cuda.empty_cache()
         return return_dict
 
     @torch.no_grad()
-    def generate_images(
-        self, latents, timesteps, encoder_hidden_states, scheduler, num_inference_steps
-    ):
+    def generate_images(self, latents, timesteps, encoder_hidden_states, scheduler, num_inference_steps):
         for i, t in enumerate(timesteps):
             latent_model_input = scheduler.scale_model_input(latents, t)
 
@@ -655,11 +633,34 @@ class FaceNet:
         self.model = MTCNN(keep_all=True, margin=0)
         self.to_pil = T.ToPILImage()
 
-    def detect(self, image):
-        return self.model.detect(image)
+    def detect(self, image, landmarks=False):
+        return self.model.detect(image, landmarks=landmarks)
 
     def tensor_to_pil(self, tensor_image):
         return self.to_pil(tensor_image.cpu().float().clamp(0, 1))
+
+
+def extract_focus_region(image, point, face_rate):
+    """
+    画像からポイントの周囲を face_rate に基づいて矩形領域として切り取る関数。
+    """
+    x, y = int(point[0]), int(point[1])
+    box_size = int(min(image.width, image.height) * face_rate)
+
+    left = min(max(x - box_size // 2, 0), image.width)
+    top = min(max(y - box_size // 2, 0), image.height)
+    right = max(min(x + box_size // 2, image.width), 0)
+    bottom = max(min(y + box_size // 2, image.height), 0)
+
+    try:
+        focus_region = image.crop((left, top, right, bottom))
+    except Exception as e:
+        ic(image.width, image.height)
+        ic(x, y, box_size)
+        ic(left, top, right, bottom)
+        raise e
+
+    return focus_region
 
 
 def save_batch_images(batch, save_directory):
@@ -688,15 +689,9 @@ def save_batch_images(batch, save_directory):
         num_objects = batch["num_objects"][i].item()
         for j in range(num_objects):
             object_pixel_values = batch["object_pixel_values"][i][j].cpu()
-            object_img = vutils.make_grid(
-                object_pixel_values, normalize=True, scale_each=True
-            )
-            object_img_pil = Image.fromarray(
-                object_img.mul(255).permute(1, 2, 0).byte().numpy()
-            )
-            object_img_pil.save(
-                os.path.join(save_directory, f"image_{num_image}_object_{j}.png")
-            )
+            object_img = vutils.make_grid(object_pixel_values, normalize=True, scale_each=True)
+            object_img_pil = Image.fromarray(object_img.mul(255).permute(1, 2, 0).byte().numpy())
+            object_img_pil.save(os.path.join(save_directory, f"image_{num_image}_object_{j}.png"))
 
         # print(f"Saved images for batch index {i}")
 

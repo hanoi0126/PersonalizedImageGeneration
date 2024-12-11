@@ -5,22 +5,26 @@ output_dir: outputs/${now_dir}
 
 # input
 reference_image: data/celeba/000023/000023_hb_x4_resize.png
+reference_dir: data/celeba_test_single
+# reference_dir: 
 generated_image: outputs/2024-09-13/23-50-24/output_0.png
-generated_image_dir: outputs/2024-11-12/13-20-15
+generated_image_dir: outputs/2024-11-26/16-05-14
 
 # validate metrics
 # not replicate
 # data/celeba/00001
-# replicate
+# replicate wo scattering
 # data/celeba_inpaint
+# replicate with scattering
+# data/celeba_inpaint_2
 
 # generated results
-# bm: outputs/2024-10-08/15-12-14
-# v1: outputs/2024-10-30/12-53-42
-# v2: outputs/2024-11-12/13-20-15
+# bm            : outputs/2024-11-26/12-29-12
+# v1 face       : outputs/2024-11-26/13-21-37
+# v2 expression : outputs/2024-11-26/16-05-14
 
 # for vlm 
-few_shot_example: data/example/merged_image.png
+few_shot_example: data/example/merged_image_modified.png
 request_for_image: 1
 model: gemini-1.5-pro-latest # gpt-4o, gemini-1.5-flash-latest, gemini-1.5-pro-latest
 
@@ -53,9 +57,23 @@ caption_list:
   - a man <|image|> is holding a glass of wine
   - a man <|image|> is holding a piece of cake
   - a man <|image|> is giving a lecture
-  - a man <|image|> is reading a book
   - a man <|image|> is gardening in the backyard
   - a man <|image|> is cooking a meal
   - a man <|image|> is working out at the gym
   - a man <|image|> is walking the dog
   - a man <|image|> is baking cookies
+  - A confident pilot <|image|>, with aviator sunglasses, a leather bomber jacket, and a scarf billowing in the wind, standing in front of an old-fashioned biplane, his face half-lit by the setting sun.
+  - A thoughtful artist <|image|>, brush in hand, deep in concentration, wearing a paint-splattered apron, standing in front of a massive canvas, colors swirling in abstract patterns, sunlight filtering through the studio window onto his serene expression.
+  - A stern soldier <|image|>, with a neatly trimmed beard, wearing a dusty camouflage uniform and a beret, standing at attention in front of a military tent, his intense gaze focused on the horizon.
+  - A jubilant football coach <|image|>, whistle hanging from his neck, arms raised in victory, wearing a team jacket and cap, standing on the sidelines of a stadium, the roaring crowd behind him blurring in the background.
+  - A weary traveler <|image|>, with a rugged beard, backpack slung over his shoulder, a wide-brimmed hat shading his tired eyes, standing on a mountain trail as twilight descends, distant peaks silhouetted against the sky.
+  - A relaxed beachgoer <|image|>, reclining on a sun lounger, sunglasses on his face, wearing a floral-patterned shirt and holding a coconut drink with an umbrella, the ocean waves gently crashing behind him, a satisfied smile on his face.
+  - A charismatic magician <|image|>, in a black tuxedo with a red rose on the lapel, performing a card trick, his gloved hands moving swiftly, a top hat sitting on his head, eyes gleaming with mischief, the stage lights reflecting in his gaze.
+  - A contemplative philosopher <|image|>, sitting at a rustic wooden desk, quill in hand, surrounded by ancient books and scrolls, candlelight flickering on his face as he gazes out of a small window, pondering the mysteries of the universe.
+  - A cheerful bartender <|image|>, with a slicked-back hairstyle, wearing a white shirt and black vest, shaking a cocktail mixer, standing behind a polished wooden bar, bottles of liquor lined up neatly in the background, a playful grin on his face.
+  - A daring astronaut <|image|>, visor up, revealing a determined expression, wearing a white spacesuit, floating just outside a space station, Earth looming large in the background, the Milky Way stretching out behind him in the endless void.
+  - A focused chef <|image|>, with a white apron tied around his waist, meticulously plating a gourmet dish, the kitchen bustling behind him, steam rising from pots, his face set in concentration, but his eyes gleaming with passion for his craft.
+  - A mysterious spy <|image|>, in a sleek black suit, adjusting his cufflinks, standing in the shadows of a dimly lit parking garage, his face partially obscured by darkness, but his piercing eyes visible, a sleek black car waiting behind him.
+  - A proud sailor <|image|>, standing at the bow of a ship, hands gripping the railing, his captain's hat firmly on his head, looking out to sea, the salty breeze blowing through his hair, waves crashing against the hull, determination in his eyes.
+  - A joyful musician <|image|>, playing a saxophone on a dimly lit stage, eyes closed in deep concentration, wearing a loose-fitting suit and a fedora, the spotlight catching the sweat on his brow, the sound of jazz filling the smoky room.
+  - A reflective scholar <|image|>, wearing round glasses, his fingers tracing the spine of an ancient tome in a grand library, sunlight streaming through stained-glass windows onto rows of leather-bound books, a peaceful smile on his face as he contemplates his next discovery.
