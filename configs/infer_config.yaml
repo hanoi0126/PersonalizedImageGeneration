@@ -1,0 +1,39 @@
+# General Settings
+now_dir: ${now:%Y-%m-%d}/${now:%H-%M-%S}
+mixed_precision: fp16  # choices: ["no", "fp16", "bf16"]
+output_dir: outputs/${now_dir}
+seed: 42
+pretrained_model_path: models/basemodel
+finetuned_model_path: outputs/2024-12-12/15-11-49/checkpoint-3000
+enable_xformers_memory_efficient_attention: false
+
+# Inference
+caption: a man <|image|> reading book
+reference_dir: data/reference
+max_num_objects: 10
+num_images_per_prompt: 1
+inference_steps: 50
+generate_height: 512
+generate_width: 512
+guidance_scale: 5
+start_merge_step: 10
+
+# Model Settings
+revision: null
+non_ema_revision: null
+object_localization: false
+object_localization_weight: 0.0
+localization_layers: 0
+mask_loss: 0.0
+mask_loss_prob: 0.0
+object_localization_threshold: 0.0
+object_localization_normalize: 0.0
+image_encoder_name_or_path: openai/clip-vit-large-patch14
+no_object_augmentation: true
+object_resolution: 224
+image_encoder_type: clip
+
+# Custom
+face_separation: False
+face_separation_weight: 
+face_separation_delta: 

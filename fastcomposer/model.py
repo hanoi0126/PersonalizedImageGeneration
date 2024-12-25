@@ -501,9 +501,7 @@ class FastComposerModel(nn.Module):
 
         encoder_hidden_states = self.text_encoder(
             input_ids, image_token_mask, object_embeds, num_objects
-        )[
-            0
-        ]  # (bsz, seq_len, dim)
+        )[0]  # (bsz, seq_len, dim)
 
         encoder_hidden_states = self.postfuse_module(
             encoder_hidden_states,
@@ -664,8 +662,7 @@ class FastComposerModel(nn.Module):
 
             # identity errors は numpy で返ってくる
             identity_separation_loss = (
-                np.mean(identity_errors)
-                * self.cfg.identity_separation_weight
+                np.mean(identity_errors) * self.cfg.identity_separation_weight
             )
             return_dict["identity_separation_loss"] = identity_separation_loss
             loss += identity_separation_loss
@@ -772,8 +769,6 @@ class LossAdapter:
 
     def identity_loss(self, image1: Image, image2: Image) -> float:
         try:
-            essential_sim = self.calc_face_essential_similarity(image1, image2)
-            face_sim = self.calc_face_similarity(image1, image2)
             return abs(
                 self.calc_face_essential_similarity(image1, image2)
                 - self.calc_face_similarity(image1, image2)
@@ -781,7 +776,6 @@ class LossAdapter:
         except Exception as e:
             print(e)
             return 0.0
-
 
 
 def extract_focus_region(image, point, face_rate):

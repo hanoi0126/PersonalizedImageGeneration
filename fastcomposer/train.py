@@ -42,7 +42,6 @@ wandb.init(
 
 @hydra.main(version_base=None, config_path="../configs", config_name="train_config")
 def train(cfg: DictConfig) -> None:
-
     accelerator = Accelerator(
         gradient_accumulation_steps=cfg.gradient_accumulation_steps,
         mixed_precision=cfg.mixed_precision,
@@ -341,8 +340,11 @@ def train(cfg: DictConfig) -> None:
         for step, batch in enumerate(train_dataloader):
             progress_bar.set_description("Global step: {}".format(global_step))
 
-            with accelerator.accumulate(model), torch.backends.cuda.sdp_kernel(
-                enable_flash=not cfg.disable_flashattention
+            with (
+                accelerator.accumulate(model),
+                torch.backends.cuda.sdp_kernel(
+                    enable_flash=not cfg.disable_flashattention
+                ),
             ):
                 if step % 100 == 0:
                     return_dict = model(batch, noise_scheduler, return_image=True)
