@@ -4,7 +4,7 @@ output_dir: outputs/${now_dir}
 logging_dir: outputs/${now_dir}/logs
 
 # training options
-face_separation: False
+face_separation: True
 face_separation_weight: 1e-3
 face_separation_delta: 0.5
 
@@ -16,7 +16,7 @@ landmark_separation: False
 landmark_separation_weight: 1e-3
 landmark_separation_delta: 0.5
 
-identity_separation: True
+identity_separation: False
 identity_separation_weight: 1.0
 identity_separation_delta: 0.05
 
@@ -36,7 +36,7 @@ max_train_samples: 100
 # training
 train_batch_size: 2
 num_train_epochs: 100 # 150000
-max_train_steps: 50000 # 150000
+max_train_steps: 150000 # 150000
 gradient_accumulation_steps: 1
 gradient_checkpointing: True
 
@@ -104,8 +104,8 @@ lr_scheduler: constant
 lr_warmup_steps: 500
 
 # checkpoint
-checkpointing_steps: 200
-keep_only_last_checkpoint: True
+checkpointing_steps: 10000
+keep_only_last_checkpoint: False
 keep_interval: 10000
 resume_from_checkpoint: models/fastcomposer
 global_step: 0

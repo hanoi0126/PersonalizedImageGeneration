@@ -45,7 +45,7 @@ def main(cfg: DictConfig) -> None:
         cfg.pretrained_model_path, torch_dtype=weight_dtype
     )
 
-    model = FastComposerModel.from_pretrained(cfg)  # TODO: Check this
+    model = FastComposerModel.from_pretrained(cfg)
 
     ckpt_name = "pytorch_model.bin"
 
@@ -103,14 +103,12 @@ def main(cfg: DictConfig) -> None:
     os.makedirs(cfg.output_dir, exist_ok=True)
 
     batch = demo_dataset.get_data()
-
     input_ids = batch["input_ids"].to(accelerator.device)
-    # text = tokenizer.batch_decode(input_ids)[0]
-    print(prompt)
-    # print(input_ids)
+
+    print(f"{prompt=}")
+
     image_token_mask = batch["image_token_mask"].to(accelerator.device)
 
-    # print(image_token_mask)
     all_object_pixel_values = (
         batch["object_pixel_values"].unsqueeze(0).to(accelerator.device)
     )

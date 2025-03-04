@@ -1,5 +1,5 @@
 #!/bin/sh
-#PJM -L elapse=10:00:00
+#PJM -L elapse=0:30:00
 #PJM -L rscgrp=share
 #PJM -L gpu=1
 #PJM -g gb20
@@ -35,13 +35,7 @@ EOF
 
 export PYTHONPATH="$PWD:$PYTHONPATH"
 
-CUDA_VISIBLE_DEVICES=0 accelerate launch \
-    --mixed_precision=bf16 \
-    --machine_rank 0 \
-    --num_machines 1 \
-    --main_process_port 11135 \
-    --num_processes 1 \
-    fastcomposer/train.py >> ${LOG_DIR}/job_output.log 2>&1
+python fastcomposer/batch_infer.py >> ${LOG_DIR}/job_output.log 2>&1
 
 # record job information
 cat <<EOF >> ${LOG_DIR}/job_output.log

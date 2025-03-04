@@ -223,7 +223,7 @@ class FastComposerDataset(torch.utils.data.Dataset):
             self.image_ids = filtered_image_ids
 
         if balance_num_objects:
-            _balance_num_objects(self)
+            pass
 
     def __len__(self):
         return len(self.image_ids)
