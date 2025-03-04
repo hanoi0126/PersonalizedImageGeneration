@@ -1,4 +1,6 @@
 .cache/
+data/ffhq_fastcomposer.tgz
+data/ffhq_wild_files/
 .env
 generated_images/
 logs/
