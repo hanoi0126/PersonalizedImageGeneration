@@ -1,9 +1,11 @@
 .cache/
 .env
+generated_images/
 logs/
 models/
 outputs/
-*.out
 __pycache__/
 venv/
 wandb/
+
+*.out

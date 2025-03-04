@@ -12,6 +12,7 @@ import hydra
 import torch
 import torch.utils.checkpoint
 import transformers
+import wandb
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import set_seed
@@ -22,7 +23,6 @@ from omegaconf import DictConfig, OmegaConf
 from tqdm.auto import tqdm
 from transformers import CLIPTokenizer
 
-import wandb
 from fastcomposer.data import FastComposerDataset, get_data_loader
 from fastcomposer.model import FastComposerModel
 from fastcomposer.transforms import (

@@ -1,0 +1,64 @@
+# General Settings
+now_dir: ${now:%Y-%m-%d}/${now:%H-%M-%S}
+output_dir: outputs/${now_dir}
+
+
+# input
+reference_image: data/celeba/000023/000023_hb_x4_resize.png
+reference_dir: data/celeba_test_single
+# reference_dir: 
+generated_image: outputs/2024-09-13/23-50-24/output_0.png
+generated_image_dir: generated_images/250303_face_10000
+
+# validate metrics
+# not replicate
+# data/celeba/00001
+# replicate wo scattering
+# data/celeba_inpaint
+# replicate with scattering
+# data/celeba_inpaint_2
+
+# generated results
+# bm            : outputs/2024-11-26/12-29-12
+# v1 face       : outputs/2024-11-26/13-21-37
+# v2 expression : outputs/2024-11-26/16-05-14
+
+# for vlm 
+few_shot_example: data/example/merged_image_modified.png
+request_for_image: 1
+model: gemini-2.0-flash-lite # gemini-2.0-flash-lite, gemini-1.5-pro-latest
+
+# prompt
+markdown: true
+save_csv_path: ${output_dir}/result.csv
+caption_list:
+  - a man <|image|> reading book
+  - a man <|image|> wearing a red hatf
+  - a man <|image|> wearing a santa hat
+  - a man <|image|> wearing a rainbow scarf
+  - a man <|image|> wearing a black top hat and a monocle
+  - a man <|image|> in a chef outfit
+  - a man <|image|> in a firefighter outfit
+  - a man <|image|> in a police outfit
+  - a man <|image|> wearing pink glasses
+  - a man <|image|> wearing a yellow shirt
+  - a man <|image|> in a purple wizard outfit
+  - a man <|image|> is in the jungle
+  - a man <|image|> is in the snow
+  - a man <|image|> is on the beach
+  - a man <|image|> is on a cobblestone street
+  - a man <|image|> is on top of pink fabric
+  - a man <|image|> is on top of a wooden floor
+  - a man <|image|> is with a city in the background
+  - a man <|image|> is with a mountain in the background
+  - a man <|image|> is with a blue house in the background
+  - a man <|image|> is on top of a purple rug in a forest
+  - a man <|image|> is riding a horse
+  - a man <|image|> is holding a glass of wine
+  - a man <|image|> is holding a piece of cake
+  - a man <|image|> is giving a lecture
+  - a man <|image|> is gardening in the backyard
+  - a man <|image|> is cooking a meal
+  - a man <|image|> is working out at the gym
+  - a man <|image|> is walking the dog
+  - a man <|image|> is baking cookies
