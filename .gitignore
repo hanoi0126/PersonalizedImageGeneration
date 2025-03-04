@@ -1,5 +1,4 @@
 .cache/
-data/
 .env
 logs/
 models/
