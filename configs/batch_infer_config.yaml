@@ -4,11 +4,8 @@ mixed_precision: fp16  # choices: ["no", "fp16", "bf16"]
 output_dir: outputs/${now_dir}
 seed: 42
 pretrained_model_path: models/basemodel
-finetuned_model_path: outputs/2024-11-26/13-16-21/checkpoint-3400
+finetuned_model_path: outputs/2025-03-04/00-32-23/checkpoint-10000
 enable_xformers_memory_efficient_attention: false
-
-# v1 face: outputs/2024-10-29/19-10-11/checkpoint-3200
-# v2 expression: outputs/2024-11-26/13-16-21/checkpoint-3400
 
 reference_dir: data/celeba_test_single
 max_num_objects: 10
@@ -66,29 +63,9 @@ caption_list:
   - a man <|image|> is working out at the gym
   - a man <|image|> is walking the dog
   - a man <|image|> is baking cookies
-  # added prompt
-  - A confident pilot <|image|>, with aviator sunglasses, a leather bomber jacket, and a scarf billowing in the wind, standing in front of an old-fashioned biplane, his face half-lit by the setting sun.
-  - A thoughtful artist <|image|>, brush in hand, deep in concentration, wearing a paint-splattered apron, standing in front of a massive canvas, colors swirling in abstract patterns, sunlight filtering through the studio window onto his serene expression.
-  - A stern soldier <|image|>, with a neatly trimmed beard, wearing a dusty camouflage uniform and a beret, standing at attention in front of a military tent, his intense gaze focused on the horizon.
-  - A jubilant football coach <|image|>, whistle hanging from his neck, arms raised in victory, wearing a team jacket and cap, standing on the sidelines of a stadium, the roaring crowd behind him blurring in the background.
-  - A weary traveler <|image|>, with a rugged beard, backpack slung over his shoulder, a wide-brimmed hat shading his tired eyes, standing on a mountain trail as twilight descends, distant peaks silhouetted against the sky.
-  - A relaxed beachgoer <|image|>, reclining on a sun lounger, sunglasses on his face, wearing a floral-patterned shirt and holding a coconut drink with an umbrella, the ocean waves gently crashing behind him, a satisfied smile on his face.
-  - A charismatic magician <|image|>, in a black tuxedo with a red rose on the lapel, performing a card trick, his gloved hands moving swiftly, a top hat sitting on his head, eyes gleaming with mischief, the stage lights reflecting in his gaze.
-  - A contemplative philosopher <|image|>, sitting at a rustic wooden desk, quill in hand, surrounded by ancient books and scrolls, candlelight flickering on his face as he gazes out of a small window, pondering the mysteries of the universe.
-  - A cheerful bartender <|image|>, with a slicked-back hairstyle, wearing a white shirt and black vest, shaking a cocktail mixer, standing behind a polished wooden bar, bottles of liquor lined up neatly in the background, a playful grin on his face.
-  - A daring astronaut <|image|>, visor up, revealing a determined expression, wearing a white spacesuit, floating just outside a space station, Earth looming large in the background, the Milky Way stretching out behind him in the endless void.
-  - A focused chef <|image|>, with a white apron tied around his waist, meticulously plating a gourmet dish, the kitchen bustling behind him, steam rising from pots, his face set in concentration, but his eyes gleaming with passion for his craft.
-  - A mysterious spy <|image|>, in a sleek black suit, adjusting his cufflinks, standing in the shadows of a dimly lit parking garage, his face partially obscured by darkness, but his piercing eyes visible, a sleek black car waiting behind him.
-  - A proud sailor <|image|>, standing at the bow of a ship, hands gripping the railing, his captain's hat firmly on his head, looking out to sea, the salty breeze blowing through his hair, waves crashing against the hull, determination in his eyes.
-  - A joyful musician <|image|>, playing a saxophone on a dimly lit stage, eyes closed in deep concentration, wearing a loose-fitting suit and a fedora, the spotlight catching the sweat on his brow, the sound of jazz filling the smoky room.
-  - A reflective scholar <|image|>, wearing round glasses, his fingers tracing the spine of an ancient tome in a grand library, sunlight streaming through stained-glass windows onto rows of leather-bound books, a peaceful smile on his face as he contemplates his next discovery.
 
 # Custom
 face_separation: False
 face_expression: False
 face_separation_weight: 
 face_separation_delta: 
-
-
-# Inference
-# caption_list:
