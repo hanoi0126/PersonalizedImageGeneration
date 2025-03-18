@@ -367,7 +367,8 @@ def train(cfg: DictConfig) -> None:
                 denoise_loss += (
                     avg_denoise_loss.item() / cfg.gradient_accumulation_steps
                 )
-                loss = return_dict["denoise_loss"] + return_dict["localization_loss"]
+
+                check_grad("denoise_loss", return_dict["denoise_loss"])
 
                 if "localization_loss" in return_dict:
                     avg_localization_loss = accelerator.gather(
@@ -376,74 +377,49 @@ def train(cfg: DictConfig) -> None:
                     localization_loss += (
                         avg_localization_loss.item() / cfg.gradient_accumulation_steps
                     )
+                    check_grad("localization_loss", return_dict["localization_loss"])
 
                 if "face_separation_loss" in return_dict:
                     avg_face_separation_loss = accelerator.gather(
                         return_dict["face_separation_loss"].repeat(cfg.train_batch_size)
                     ).mean()
-                    # 各値を float に変換してから計算
-                    avg_face_separation_loss_value = float(
+                    face_separation_loss += (
                         avg_face_separation_loss.item()
-                    ) / float(cfg.gradient_accumulation_steps)
-                    adjusted_face_loss = avg_face_separation_loss_value - float(
-                        cfg.face_separation_delta
+                        / cfg.gradient_accumulation_steps
                     )
-                    # 条件分岐で adjusted_loss を加算
-                    if adjusted_face_loss > 0.0:
-                        face_separation_loss += adjusted_face_loss
-                        loss += adjusted_face_loss
+                    check_grad(
+                        "face_separation_loss", return_dict["face_separation_loss"]
+                    )
 
                 if "essential_loss" in return_dict:
-                    avg_denoise_loss = accelerator.gather(
+                    avg_essential_loss = accelerator.gather(
                         return_dict["essential_loss"].repeat(cfg.train_batch_size)
                     ).mean()
-
                     essential_loss += (
-                        avg_denoise_loss.item() / cfg.gradient_accumulation_steps
+                        avg_essential_loss.item() / cfg.gradient_accumulation_steps
                     )
+                    check_grad("essential_loss", return_dict["essential_loss"])
 
-                    loss += return_dict["essential_loss"]
+                # loss >>> これで勾配を更新
+                loss = return_dict["loss"]
+                check_grad("loss", loss)
 
                 # Gather the losses across all processes for logging (if we use distributed training).
                 avg_loss = accelerator.gather(loss.repeat(cfg.train_batch_size)).mean()
                 train_loss += avg_loss.item() / cfg.gradient_accumulation_steps
 
-                # 各 loss 項の値を取得
-                loss_denoise = return_dict["denoise_loss"]
-                loss_localization = return_dict.get("localization_loss")
-                loss_face = return_dict.get("face_separation_loss")
-                loss_essential = return_dict.get("essential_loss")
-
                 # 各 loss の値をまとめてログ出力
-                log_msg = f"Step {global_step}: loss: {avg_loss:.6f}"
-                if loss_denoise is not None:
-                    log_msg += f", denoise_loss: {loss_denoise.item():.6f}"
-                if loss_localization is not None:
-                    log_msg += f", localization_loss: {loss_localization.item():.6f}"
-                if loss_face is not None:
-                    log_msg += f", face_separation_loss: {loss_face.item():.6f}"
-                if loss_essential is not None:
-                    log_msg += f", essential_loss: {loss_essential.item():.6f}"
+                log_msg = f"Step {global_step}: loss: {train_loss:.6f}"
+                if denoise_loss is not None:
+                    log_msg += f", denoise_loss: {denoise_loss:.6f}"
+                if localization_loss is not None:
+                    log_msg += f", localization_loss: {localization_loss:.6f}"
+                if face_separation_loss is not None:
+                    log_msg += f", face_separation_loss: {face_separation_loss:.6f}"
+                if essential_loss is not None:
+                    log_msg += f", essential_loss: {essential_loss:.6f}"
 
                 logger.info(log_msg)
-
-                # 各 loss 項ごとに、モデルパラメータに対する勾配ノルムを計算
-                for loss_name, loss_value in [
-                    ("denoise_loss", loss_denoise),
-                    ("localization_loss", loss_localization),
-                    ("face_separation_loss", loss_face),
-                    ("essential_loss", loss_essential),
-                ]:
-                    if loss_value is None:
-                        print(f"{loss_name}: None")
-                        continue
-                    # 損失が微分可能かどうかをチェック
-                    if not loss_value.requires_grad:
-                        print(f"{loss_name} does not require grad!")
-                        continue
-                    if loss_value.grad_fn is None:
-                        print(f"{loss_name} has no grad_fn!")
-                        continue
 
                 # Backpropagate
                 accelerator.backward(loss)
@@ -466,10 +442,20 @@ def train(cfg: DictConfig) -> None:
                 }
                 if "localization_loss" in return_dict:
                     log_dict["localization_loss"] = localization_loss
+                    log_dict["localization_term"] = (
+                        localization_loss * cfg.object_localization_weight
+                    )
                 if "face_separation_loss" in return_dict:
                     log_dict["face_separation_loss"] = face_separation_loss
+                    log_dict["face_error"] = return_dict["face_error"].item()
+                    log_dict["face_separation_term"] = (
+                        face_separation_loss * cfg.face_separation_weight
+                    )
                 if "essential_loss" in return_dict:
                     log_dict["essential_loss"] = essential_loss
+                    log_dict["essential_term"] = (
+                        essential_loss * cfg.essential_loss_weight
+                    )
 
                 accelerator.log(
                     log_dict,
@@ -547,6 +533,17 @@ def train(cfg: DictConfig) -> None:
         pipeline.save_pretrained(cfg.output_dir)
 
     accelerator.end_training()
+
+
+def check_grad(loss_name: str, loss_value: torch.Tensor) -> None:
+    if loss_value is None:
+        print(f"{loss_name}: None")
+
+    # 損失が微分可能かどうかをチェック
+    if not loss_value.requires_grad:
+        print(f"{loss_name} does not require grad!")
+    if loss_value.grad_fn is None:
+        print(f"{loss_name} has no grad_fn!")
 
 
 if __name__ == "__main__":

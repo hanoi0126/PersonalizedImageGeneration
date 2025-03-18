@@ -638,8 +638,9 @@ class FastComposerModel(nn.Module):
                     dim=1,
                 )
 
-                # roi_align で顔領域を切り出し（出力サイズは例として 64×64）
-                output_size = (64, 64)
+                # roi_align で顔領域を切り出し
+                # NOTE: ここを変えると loss が変わる（本研究はこれで Fix）
+                output_size = (128, 128)
                 ref_face = ops.roi_align(
                     ref_image_tensor, ref_box, output_size, spatial_scale=1.0
                 )
@@ -650,17 +651,20 @@ class FastComposerModel(nn.Module):
                 mse_loss_face = F.mse_loss(gen_face, ref_face, reduction="mean")
                 face_errors.append(mse_loss_face)
 
-            face_separation_loss = (
-                torch.stack(face_errors).mean() * self.cfg.face_separation_weight
+            face_error = torch.stack(face_errors).mean()
+            face_separation_loss = torch.clamp(
+                self.cfg.face_separation_delta - face_error, min=0
             )
+            return_dict["face_error"] = face_error
             return_dict["face_separation_loss"] = face_separation_loss
-            loss += face_separation_loss
+            loss += self.cfg.face_separation_weight * face_separation_loss
 
         # -------------------------
         # Differentiable Essential Loss
         # -------------------------
         if self.cfg.essential_loss:
-            required_size = (160, 160)
+            # 画像サイズをリサイズ（本研究はこれで Fix）
+            required_size = (128, 128)
             ref_images = F.interpolate(
                 pixel_values, size=required_size, mode="bilinear", align_corners=False
             )
@@ -674,14 +678,11 @@ class FastComposerModel(nn.Module):
             ref_images = ref_images * 2 - 1
             gen_images = gen_images * 2 - 1
             # 埋め込み計算（detach せず微分可能な状態で計算）
-            essential_loss_value = (
-                self.essential_loss_adapter.calc_face_essential_similarity(
-                    ref_images, gen_images
-                )
+            essential_loss_value = self.essential_loss_adapter.calc_essential_loss(
+                ref_images, gen_images
             )
-            essential_loss = essential_loss_value * self.cfg.essential_loss_weight
-            return_dict["essential_loss"] = essential_loss
-            loss += essential_loss
+            return_dict["essential_loss"] = essential_loss_value
+            loss += essential_loss_value * self.cfg.essential_loss_weight
 
         return_dict["loss"] = loss
         loss_message = f"loss: {loss}, denoise_loss: {denoise_loss}"
@@ -690,8 +691,18 @@ class FastComposerModel(nn.Module):
         if self.cfg.face_separation:
             loss_message += f", face_separation_loss: {face_separation_loss}"
         if self.cfg.essential_loss:
-            loss_message += f", essential_loss: {essential_loss}"
-        # print("\n", loss_message)
+            loss_message += f", essential_loss: {essential_loss_value}"
+
+        print(f"\n{loss_message}")
+        print(
+            f"localization_loss > {localization_loss}, localization_lambda > {self.object_localization_weight}, localization_term > {localization_loss * self.object_localization_weight}"
+        )
+        print(
+            f"face_error > {face_error}, face_sep_delta > {self.cfg.face_separation_delta}, face_sep_lambda > {self.cfg.face_separation_weight}, face_separation_term > {self.cfg.face_separation_weight * face_separation_loss}"
+        )
+        print(
+            f"essential_loss > {essential_loss_value}, essential_lambda > {self.cfg.essential_loss_weight}, essential_term > {essential_loss_value * self.cfg.essential_loss_weight}"
+        )
 
         torch.cuda.empty_cache()
 
@@ -750,7 +761,7 @@ class DifferentiableEssentialLossAdapter(nn.Module):
         super().__init__()
         self.embedding_model = embedding_model
 
-    def calc_face_essential_similarity(
+    def calc_essential_loss(
         self, image1: torch.Tensor, image2: torch.Tensor
     ) -> torch.Tensor:
         """
@@ -778,6 +789,8 @@ class DifferentiableEssentialLossAdapter(nn.Module):
         avg_embedding1 = torch.stack(embeddings1, dim=0).mean(dim=0)  # (B, embed_dim)
         avg_embedding2 = torch.stack(embeddings2, dim=0).mean(dim=0)  # (B, embed_dim)
         # 各サンプルごとにコサイン類似度を計算
-        cosine_sim = F.cosine_similarity(avg_embedding1, avg_embedding2, dim=1)  # (B,)
-        loss = (1 - cosine_sim).mean()  # スカラー損失
+        cosine_sim = F.cosine_similarity(
+            avg_embedding1, avg_embedding2, dim=1
+        )  # (B,) [-1, 1]
+        loss = (1 - cosine_sim).mean()  # スカラー損失 [0, 2]
         return loss
