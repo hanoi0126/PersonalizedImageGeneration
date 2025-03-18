@@ -692,17 +692,7 @@ class FastComposerModel(nn.Module):
             loss_message += f", face_separation_loss: {face_separation_loss}"
         if self.cfg.essential_loss:
             loss_message += f", essential_loss: {essential_loss_value}"
-
         print(f"\n{loss_message}")
-        print(
-            f"localization_loss > {localization_loss}, localization_lambda > {self.object_localization_weight}, localization_term > {localization_loss * self.object_localization_weight}"
-        )
-        print(
-            f"face_error > {face_error}, face_sep_delta > {self.cfg.face_separation_delta}, face_sep_lambda > {self.cfg.face_separation_weight}, face_separation_term > {self.cfg.face_separation_weight * face_separation_loss}"
-        )
-        print(
-            f"essential_loss > {essential_loss_value}, essential_lambda > {self.cfg.essential_loss_weight}, essential_term > {essential_loss_value * self.cfg.essential_loss_weight}"
-        )
 
         torch.cuda.empty_cache()
 
