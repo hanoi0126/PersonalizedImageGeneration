@@ -1,6 +1,6 @@
 #!/bin/sh
 #PJM -L elapse=0:30:00
-#PJM -L rscgrp=share
+#PJM -L rscgrp=share-debug
 #PJM -L gpu=1
 #PJM -g gb20
 #PJM -j

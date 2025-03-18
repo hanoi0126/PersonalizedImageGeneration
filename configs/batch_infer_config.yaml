@@ -4,7 +4,7 @@ mixed_precision: fp16  # choices: ["no", "fp16", "bf16"]
 output_dir: outputs/${now_dir}
 seed: 42
 pretrained_model_path: models/basemodel
-finetuned_model_path: outputs/2025-03-04/00-32-23/checkpoint-10000
+finetuned_model_path: outputs/2025-03-17/00-42-22/checkpoint-30000
 enable_xformers_memory_efficient_attention: false
 
 reference_dir: data/celeba_test_single

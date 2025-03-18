@@ -1,4 +1,5 @@
 import gc
+import math
 import types
 import warnings
 from typing import Optional, Tuple, Union
@@ -7,10 +8,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.ops as ops
 import torchvision.transforms as T
 from diffusers import AutoencoderKL, StableDiffusionPipeline, UNet2DConditionModel
-from facenet_pytorch import MTCNN, InceptionResnetV1, extract_face
-from icecream import ic
+from facenet_pytorch import MTCNN, InceptionResnetV1
 from PIL import Image
 from transformers import CLIPTextModel
 from transformers.modeling_outputs import BaseModelOutputWithPooling
@@ -406,7 +407,6 @@ class FastComposerModel(nn.Module):
         self.mask_loss = cfg.mask_loss
         self.mask_loss_prob = cfg.mask_loss_prob
 
-        self.adapter = LossAdapter()
         self.cfg = cfg
         self.output_dir = cfg.output_dir
 
@@ -431,6 +431,17 @@ class FastComposerModel(nn.Module):
                 del self.cross_attention_scores[k]
 
         gc.collect()
+
+    def set_adapter(self) -> None:
+        self.detector = FaceDetector()
+
+        # NOTE: 勾配は保持．重みの更新はしない
+        self.embedding_model = (
+            InceptionResnetV1(pretrained="vggface2").eval().to("cuda")
+        )
+        self.essential_loss_adapter = DifferentiableEssentialLossAdapter(
+            self.embedding_model
+        )
 
     @staticmethod
     def from_pretrained(cfg):
@@ -469,6 +480,17 @@ class FastComposerModel(nn.Module):
         pipe.postfuse_module = self.postfuse_module
 
         return pipe
+
+    def generate_images(
+        self, latents, timesteps, encoder_hidden_states, scheduler, num_inference_steps
+    ):
+        # 生成処理を微分可能にするため、torch.no_grad() は使用せずそのまま実行
+        for t in timesteps:
+            latent_model_input = scheduler.scale_model_input(latents, t)
+            noise_pred = self.unet(latent_model_input, t, encoder_hidden_states).sample
+            latents = scheduler.step(noise_pred, t, latents).prev_sample
+        image = self.vae.decode(latents / self.vae.config.scaling_factor).sample
+        return image
 
     def forward(self, batch, noise_scheduler, return_image=False):
         pixel_values = batch["pixel_values"]
@@ -567,235 +589,195 @@ class FastComposerModel(nn.Module):
 
         pred = pred.to(target.device)
 
-        if self.cfg.face_separation:  # face separation loss
+        # -------------------------
+        # Differentiable Face Separation Loss
+        # -------------------------
+        if self.cfg.face_separation:
             face_errors = []
-            for i, (ref_image_tensor, gen_image_tensor) in enumerate(
-                zip(pixel_values, decoded_gen_image)
-            ):
-                ref_image_pil = self.adapter.tensor_to_pil(ref_image_tensor)
-                gen_image_pil = self.adapter.tensor_to_pil(gen_image_tensor)
+            # pixel_values, decoded_gen_image は (B, C, H, W) のテンソルと仮定
+            for i in range(pixel_values.size(0)):
+                ref_image_tensor = pixel_values[i : i + 1]  # shape (1, C, H, W)
+                gen_image_tensor = decoded_gen_image[i : i + 1]
 
-                ref_boxes, _ = self.adapter.detect(ref_image_pil, landmarks=False)
-                gen_boxes, _ = self.adapter.detect(gen_image_pil, landmarks=False)
+                # 顔検出は非微分可能な外部処理（例：MTCNN）で行い、検出結果（バウンディングボックス）を得る
+                # ここでは検出には従来通り PIL 変換を用いるが、以降の処理はテンソル上で行う
+                ref_image_pil = self.detector.tensor_to_pil(
+                    (ref_image_tensor.squeeze(0))
+                )
+                gen_image_pil = self.detector.tensor_to_pil(
+                    (gen_image_tensor.squeeze(0))
+                )
+
+                ref_boxes, _ = self.detector.detect(ref_image_pil, landmarks=False)
+                gen_boxes, _ = self.detector.detect(gen_image_pil, landmarks=False)
 
                 if ref_boxes is None or gen_boxes is None:
-                    face_errors.append(torch.tensor(0.0))
+                    face_errors.append(
+                        torch.tensor(0.0, device=ref_image_tensor.device)
+                    )
                     continue
 
-                ref_faces = []
-                gen_faces = []
-                for j, box in enumerate(ref_boxes):
-                    tensor_face = extract_face(ref_image_pil, box)
-                    ref_faces.append(tensor_face)
-                for j, box in enumerate(gen_boxes):
-                    tensor_face = extract_face(gen_image_pil, box)
-                    gen_faces.append(tensor_face)
+                # シンプルに各画像で最初に検出された顔を利用（複数検出時は必要に応じて拡張可能）
+                ref_box = torch.tensor(
+                    np.array(ref_boxes[0], dtype=np.float32),
+                    dtype=torch.float,
+                    device=ref_image_tensor.device,
+                ).unsqueeze(0)  # shape (1, 4)
+                gen_box = torch.tensor(
+                    np.array(gen_boxes[0], dtype=np.float32),
+                    dtype=torch.float,
+                    device=gen_image_tensor.device,
+                ).unsqueeze(0)  # shape (1, 4)
+                # roi_align 用に、各バウンディングボックスに画像内のインデックスを付与：フォーマットは (batch_index, x1, y1, x2, y2)
+                ref_box = torch.cat(
+                    [torch.zeros((1, 1), device=ref_image_tensor.device), ref_box],
+                    dim=1,
+                )
+                gen_box = torch.cat(
+                    [torch.zeros((1, 1), device=gen_image_tensor.device), gen_box],
+                    dim=1,
+                )
 
-                for ref_face, gen_face in zip(ref_faces, gen_faces):
-                    ref_face = ref_face.to(gen_face.device).float()
-                    gen_face = gen_face.float()
+                # roi_align で顔領域を切り出し（出力サイズは例として 64×64）
+                output_size = (64, 64)
+                ref_face = ops.roi_align(
+                    ref_image_tensor, ref_box, output_size, spatial_scale=1.0
+                )
+                gen_face = ops.roi_align(
+                    gen_image_tensor, gen_box, output_size, spatial_scale=1.0
+                )
 
-                    mse_loss = F.mse_loss(gen_face, ref_face, reduction="mean")
-                    face_errors.append(mse_loss)
+                mse_loss_face = F.mse_loss(gen_face, ref_face, reduction="mean")
+                face_errors.append(mse_loss_face)
 
             face_separation_loss = (
                 torch.stack(face_errors).mean() * self.cfg.face_separation_weight
             )
             return_dict["face_separation_loss"] = face_separation_loss
             loss += face_separation_loss
-            print(
-                f"face_separation_loss: {torch.stack(face_errors).mean()} >> scaled: {face_separation_loss}"
+
+        # -------------------------
+        # Differentiable Essential Loss
+        # -------------------------
+        if self.cfg.essential_loss:
+            required_size = (160, 160)
+            ref_images = F.interpolate(
+                pixel_values, size=required_size, mode="bilinear", align_corners=False
             )
-
-        if self.cfg.expression_separation:  # expression separation loss
-            print("expression_separation_loss: 0.0")
-
-        if self.cfg.landmark_separation:  # landmark separation loss
-            landmark_errors = []
-            for i, (ref_image_tensor, gen_image_tensor) in enumerate(
-                zip(pixel_values, decoded_gen_image)
-            ):
-                ref_image_pil = self.adapter.tensor_to_pil(ref_image_tensor)
-                gen_image_pil = self.adapter.tensor_to_pil(gen_image_tensor)
-
-                ref_boxes, _, ref_points = self.adapter.detect(
-                    ref_image_pil, landmarks=True
+            gen_images = F.interpolate(
+                decoded_gen_image,
+                size=required_size,
+                mode="bilinear",
+                align_corners=False,
+            )
+            # [-1, 1] へスケーリング（モデルがそのレンジを要求する場合）
+            ref_images = ref_images * 2 - 1
+            gen_images = gen_images * 2 - 1
+            # 埋め込み計算（detach せず微分可能な状態で計算）
+            essential_loss_value = (
+                self.essential_loss_adapter.calc_face_essential_similarity(
+                    ref_images, gen_images
                 )
-                gen_boxes, _, gen_points = self.adapter.detect(
-                    gen_image_pil, landmarks=True
-                )
-
-                if ref_boxes is None or gen_boxes is None:
-                    landmark_errors.append(torch.tensor(0.0))
-                    continue
-
-                # calculate the distance between the points
-                for ref_point, gen_point in zip(ref_points, gen_points):
-                    # それぞれのランドマークの点の距離の平均を計算
-                    mse_loss = F.mse_loss(
-                        gen_point, ref_point, reduction="mean"
-                    )  # TODO: 修正必要
-                    landmark_errors.append(mse_loss)
-
-            landmark_separation_loss = (
-                torch.stack(landmark_errors).mean()
-                * self.cfg.landmark_separation_weight
             )
-            return_dict["landmark_separation_loss"] = landmark_separation_loss
-            loss += landmark_separation_loss
-            print(
-                f"landmark_separation_loss: {torch.stack(landmark_errors).mean()} >> scaled: {landmark_separation_loss}"
-            )
-
-        if self.cfg.identity_separation:  # identity separation loss
-            identity_errors = []
-            for i, (ref_image_tensor, gen_image_tensor) in enumerate(
-                zip(pixel_values, decoded_gen_image)
-            ):
-                ref_image_pil = self.adapter.tensor_to_pil(ref_image_tensor)
-                gen_image_pil = self.adapter.tensor_to_pil(gen_image_tensor)
-
-                identity_error = self.adapter.identity_loss(
-                    ref_image_pil, gen_image_pil
-                )
-                identity_errors.append(identity_error)
-
-            # identity errors は numpy で返ってくる
-            identity_separation_loss = (
-                np.mean(identity_errors) * self.cfg.identity_separation_weight
-            )
-            return_dict["identity_separation_loss"] = identity_separation_loss
-            loss += identity_separation_loss
-            print(
-                f"identity_separation_loss: {np.mean(identity_errors)} >> scaled: {identity_separation_loss}"
-            )
+            essential_loss = essential_loss_value * self.cfg.essential_loss_weight
+            return_dict["essential_loss"] = essential_loss
+            loss += essential_loss
 
         return_dict["loss"] = loss
-        print(
-            f"loss: {loss}, denoise_loss: {denoise_loss}, localization_loss: {localization_loss}"
-        )
+        loss_message = f"loss: {loss}, denoise_loss: {denoise_loss}"
+        if self.object_localization:
+            loss_message += f", localization_loss: {localization_loss}"
+        if self.cfg.face_separation:
+            loss_message += f", face_separation_loss: {face_separation_loss}"
+        if self.cfg.essential_loss:
+            loss_message += f", essential_loss: {essential_loss}"
+        # print("\n", loss_message)
+
         torch.cuda.empty_cache()
+
         return return_dict
 
-    @torch.no_grad()
-    def generate_images(
-        self, latents, timesteps, encoder_hidden_states, scheduler, num_inference_steps
-    ):
-        for i, t in enumerate(timesteps):
-            latent_model_input = scheduler.scale_model_input(latents, t)
 
-            # predict the noise residual
-            noise_pred = self.unet(latent_model_input, t, encoder_hidden_states).sample
+def differentiable_rotate(image: torch.Tensor, angle: float) -> torch.Tensor:
+    """
+    入力画像テンソル (B, C, H, W) を指定した角度（度単位）回転させる。
+    この回転操作は F.affine_grid と F.grid_sample を用いるため、逆伝播可能。
+    """
+    # 角度をラジアンに変換
+    angle_rad = angle * math.pi / 180.0
+    # cos, sin を torch の関数で計算（ここでは定数なのでどちらでも可）
+    cos_val = math.cos(angle_rad)
+    sin_val = math.sin(angle_rad)
 
-            # compute the previous noisy sample x_t -> x_t-1
-            latents = scheduler.step(noise_pred, t, latents).prev_sample
+    # バッチサイズ B, チャネル C, 高さ H, 幅 W
+    B, C, H, W = image.shape
 
-        image = self.vae.decode(latents / self.vae.config.scaling_factor).sample
+    # アフィン変換行列を作成 (B, 2, 3)
+    # 回転中心は画像中央と仮定する場合、平行移動項はゼロ（もしくは中心補正が必要）
+    theta = torch.tensor(
+        [[cos_val, -sin_val, 0.0], [sin_val, cos_val, 0.0]],
+        dtype=image.dtype,
+        device=image.device,
+    )
+    theta = theta.unsqueeze(0).expand(B, -1, -1)  # (B, 2, 3)
 
-        return image
+    # アフィン変換用のグリッドを生成
+    grid = F.affine_grid(theta, image.size(), align_corners=False)
+    # grid_sample で回転を実施
+    rotated = F.grid_sample(image, grid, align_corners=False)
+    return rotated
 
 
-class LossAdapter:
-    def __init__(self) -> None:
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.mtcnn = MTCNN(margin=0, keep_all=True, device=self.device)
-        self.embedding_model = (
-            InceptionResnetV1(pretrained="vggface2").eval().to(self.device)
-        )
+class FaceDetector:
+    def __init__(self):
+        self.mtcnn = MTCNN(keep_all=True, device="cuda")
         self.to_pil = T.ToPILImage()
 
-    def _detect_faces(self, image_pil: Image) -> torch.Tensor:
-        if image_pil.mode != "RGB":
-            image_pil = image_pil.convert("RGB")
-        return self.mtcnn(image_pil)
+    def tensor_to_pil(self, tensor_image: torch.Tensor) -> Image:
+        return self.to_pil(tensor_image.cpu().float().clamp(0, 1))
 
     def detect(self, image, landmarks=False):
         return self.mtcnn.detect(image, landmarks=landmarks)
 
-    def _get_embedding(self, image_tensor: torch.Tensor) -> np.ndarray:
-        return (
-            self.embedding_model(image_tensor.unsqueeze(0).to(self.device))
-            .detach()
-            .cpu()
-            .numpy()
-            .flatten()
-        )
 
-    def _calc_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
-        return np.dot(embedding1, embedding2) / (
-            np.linalg.norm(embedding1) * np.linalg.norm(embedding2)
-        )
+class DifferentiableEssentialLossAdapter(nn.Module):
+    def __init__(self, embedding_model):
+        """
+        embedding_model:
+            微分可能な埋め込みネットワーク（例：InceptionResnetV1など）
+            入力画像は (B, C, H, W) で、レンジは [0,1] あるいは [-1,1] で与える。
+        """
+        super().__init__()
+        self.embedding_model = embedding_model
 
-    def calc_face_similarity(self, image1: Image, image2: Image) -> float:
-        image1_tensor = self._detect_faces(image1)[0]
-        image2_tensor = self._detect_faces(image2)[0]
-        embedding1 = self._get_embedding(image1_tensor)
-        embedding2 = self._get_embedding(image2_tensor)
+    def calc_face_essential_similarity(
+        self, image1: torch.Tensor, image2: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        image1, image2: (B, C, H, W) のテンソルとして与える。
+        それぞれの画像に対して、0～350度を10度刻みで回転させた画像群から
+        埋め込みを計算し、平均埋め込み同士のコサイン類似度から Essential Loss を算出する。
 
-        return self._calc_similarity(embedding1, embedding2)
-
-    def tensor_to_pil(self, tensor_image):
-        return self.to_pil(tensor_image.cpu().float().clamp(0, 1))
-
-    def calc_face_essential_similarity(self, image1: Image, image2: Image) -> float:
-        # rotate image
-        stack_embedding_image1 = []
-        stack_embedding_image2 = []
-        for angle in range(0, 360, 10):
-            image1_rotated = image1.rotate(angle)
-            image2_rotated = image2.rotate(angle)
-
-            image1_tensor = self._detect_faces(image1_rotated)
-            image2_tensor = self._detect_faces(image2_rotated)
-
-            if image1_tensor is None or image2_tensor is None:
-                continue
-            embedding1 = self._get_embedding(image1_tensor[0])
-            embedding2 = self._get_embedding(image2_tensor[0])
-
-            stack_embedding_image1.append(embedding1)
-            stack_embedding_image2.append(embedding2)
-
-        if not stack_embedding_image1 or not stack_embedding_image2:
-            raise ValueError(
-                "No embeddings could be calculated from the rotated images."
-            )
-
-        # average
-        mean_embedding_image1 = np.mean(stack_embedding_image1, axis=0)
-        mean_embedding_image2 = np.mean(stack_embedding_image2, axis=0)
-
-        return self._calc_similarity(mean_embedding_image1, mean_embedding_image2)
-
-    def identity_loss(self, image1: Image, image2: Image) -> float:
-        try:
-            return abs(
-                self.calc_face_essential_similarity(image1, image2)
-                - self.calc_face_similarity(image1, image2)
-            )
-        except Exception as e:
-            print(e)
-            return 0.0
-
-
-def extract_focus_region(image, point, face_rate):
-    """
-    画像からポイントの周囲を face_rate に基づいて矩形領域として切り取る関数。
-    """
-    x, y = int(point[0]), int(point[1])
-    box_size = int(min(image.width, image.height) * face_rate)
-
-    left = min(max(x - box_size // 2, 0), image.width)
-    top = min(max(y - box_size // 2, 0), image.height)
-    right = max(min(x + box_size // 2, image.width), 0)
-    bottom = max(min(y + box_size // 2, image.height), 0)
-
-    try:
-        focus_region = image.crop((left, top, right, bottom))
-    except Exception as e:
-        ic(image.width, image.height)
-        ic(x, y, box_size)
-        ic(left, top, right, bottom)
-        raise e
-
-    return focus_region
+        Loss = mean[1 - cosine_similarity( avg_embedding(image1), avg_embedding(image2) )]
+        """
+        # 回転角のリスト（0, 10, 20, ..., 350）
+        angles = torch.arange(0, 360, 10, device=image1.device, dtype=torch.float32)
+        embeddings1 = []
+        embeddings2 = []
+        self.embedding_model.eval()  # NOTE: 全体の影響を受けるのでここで毎回 eval にする
+        # 各角度ごとに回転画像を生成し、埋め込みを計算
+        for angle in angles:
+            # differentiable_rotate は (B, C, H, W) を返す
+            rotated1 = differentiable_rotate(image1, angle)
+            rotated2 = differentiable_rotate(image2, angle)
+            emb1 = self.embedding_model(rotated1)  # 例: (B, embed_dim)
+            emb2 = self.embedding_model(rotated2)
+            embeddings1.append(emb1)
+            embeddings2.append(emb2)
+        # 複数角度分の埋め込みをスタックして平均（角度軸で平均）
+        avg_embedding1 = torch.stack(embeddings1, dim=0).mean(dim=0)  # (B, embed_dim)
+        avg_embedding2 = torch.stack(embeddings2, dim=0).mean(dim=0)  # (B, embed_dim)
+        # 各サンプルごとにコサイン類似度を計算
+        cosine_sim = F.cosine_similarity(avg_embedding1, avg_embedding2, dim=1)  # (B,)
+        loss = (1 - cosine_sim).mean()  # スカラー損失
+        return loss

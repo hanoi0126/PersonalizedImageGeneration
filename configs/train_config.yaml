@@ -6,19 +6,10 @@ logging_dir: outputs/${now_dir}/logs
 # training options
 face_separation: True
 face_separation_weight: 1e-3
-face_separation_delta: 0.5
+face_separation_delta: 0.7
 
-expression_separation: False
-expression_separation_weight: 1e-3
-expression_separation_delta: 0.5
-
-landmark_separation: False
-landmark_separation_weight: 1e-3
-landmark_separation_delta: 0.5
-
-identity_separation: False
-identity_separation_weight: 1.0
-identity_separation_delta: 0.05
+essential_loss: True
+essential_loss_weight: 100
 
 
 
@@ -34,9 +25,9 @@ object_types: person
 max_train_samples: 100
 
 # training
-train_batch_size: 2
+train_batch_size: 1
 num_train_epochs: 100 # 150000
-max_train_steps: 150000 # 150000
+max_train_steps: 30000 # 150000
 gradient_accumulation_steps: 1
 gradient_checkpointing: True
 

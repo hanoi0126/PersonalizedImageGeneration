@@ -1,5 +1,6 @@
 import os
 import types
+from logging import Logger
 from pathlib import Path
 
 import hydra
@@ -7,7 +8,7 @@ import torch
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 from diffusers import StableDiffusionPipeline
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from transformers import CLIPTokenizer
 
 from fastcomposer.data import DemoDataset
@@ -17,12 +18,15 @@ from fastcomposer.pipeline import (
 )
 from fastcomposer.transforms import get_object_transforms
 
+logger = Logger(__name__)
+
 
 @hydra.main(
     version_base=None, config_path="../configs", config_name="batch_infer_config"
 )
 @torch.no_grad()
 def main(cfg: DictConfig) -> None:
+    logger.info(OmegaConf.to_yaml(cfg))
     accelerator = Accelerator(
         mixed_precision=cfg.mixed_precision,
     )
